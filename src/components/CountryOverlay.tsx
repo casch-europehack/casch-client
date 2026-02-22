@@ -44,10 +44,10 @@ export const CARBON_INTENSITY: Record<string, number> = {
 };
 
 export function intensityToColor(intensity: number): { color: string; emissive: string; label: string } {
-  if (intensity <= 100) {
+  if (intensity <= 150) {
     const hue = 120;
     return { color: `hsl(${hue}, 65%, 45%)`, emissive: `hsl(${hue}, 65%, 25%)`, label: "Low" };
-  } else if (intensity <= 300) {
+  } else if (intensity <= 450) {
     const t = (intensity - 100) / 200;
     const hue = 120 - t * 60;
     return { color: `hsl(${hue}, 70%, 45%)`, emissive: `hsl(${hue}, 70%, 25%)`, label: "Medium" };

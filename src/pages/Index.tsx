@@ -74,7 +74,11 @@ const Index = () => {
         setIsLoadingCO2(false);
       }
     } catch (err) {
-      toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
+      toast({
+        title: "Analysis failed",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -120,7 +124,11 @@ const Index = () => {
       const result = await scheduleJob(selectedFile, location, policyToUse);
       toast({ title: "Job Scheduled!", description: result.message });
     } catch (err) {
-      toast({ title: "Scheduling failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
+      toast({
+        title: "Scheduling failed",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setIsScheduling(false);
     }
@@ -135,12 +143,8 @@ const Index = () => {
             <Leaf className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-display font-bold text-foreground leading-tight">
-              Casch
-            </h1>
-            <p className="text-[11px] text-muted-foreground leading-tight">
-              ML training carbon profiler
-            </p>
+            <h1 className="text-lg font-display font-bold text-foreground leading-tight">CaSch</h1>
+            <p className="text-[11px] text-muted-foreground leading-tight">ML training carbon profiler</p>
           </div>
         </div>
       </header>
@@ -154,12 +158,10 @@ const Index = () => {
                 <Zap className="w-3.5 h-3.5" />
                 Understand your training's carbon footprint
               </div>
-              <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground">
-                Profile. Measure. Reduce.
-              </h2>
+              <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground">Profile. Measure. Reduce.</h2>
               <p className="text-muted-foreground mt-3 max-w-md mx-auto">
-                Upload your PyTorch training script and discover the environmental
-                impact of your ML workloads — then optimize.
+                Upload your PyTorch training script and discover the environmental impact of your ML workloads — then
+                optimize.
               </p>
             </div>
             <FileUpload
@@ -186,9 +188,7 @@ const Index = () => {
               <span className="font-display font-semibold text-foreground">
                 {profilingResult.total_epochs} epochs · {profilingResult.total_steps.toLocaleString()} steps
               </span>
-              <span className="text-muted-foreground">
-                (profiled {profilingResult.profiled_epochs} epochs)
-              </span>
+              <span className="text-muted-foreground">(profiled {profilingResult.profiled_epochs} epochs)</span>
             </div>
 
             {/* Energy chart */}

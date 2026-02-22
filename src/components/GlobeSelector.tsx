@@ -37,7 +37,7 @@ function StylizedGlobe() {
 }
 
 // Animates camera to face a location, then stops completely
-function CameraFlyTo({ flyToTrigger }: { flyToTrigger: { location: string; id: number } | null }) {
+function CameraFlyTo({ flyToTrigger, controlsRef }: { flyToTrigger: { location: string; id: number } | null; controlsRef: React.RefObject<any> }) {
   const { camera } = useThree();
   const targetPos = useRef<THREE.Vector3 | null>(null);
   const animating = useRef(false);
@@ -53,7 +53,9 @@ function CameraFlyTo({ flyToTrigger }: { flyToTrigger: { location: string; id: n
     const direction = surfacePoint.clone().normalize();
     targetPos.current = direction.multiplyScalar(CAMERA_DISTANCE);
     animating.current = true;
-  }, [flyToTrigger, camera]);
+    // Disable orbit controls during animation
+    if (controlsRef.current) controlsRef.current.enabled = false;
+  }, [flyToTrigger, camera, controlsRef]);
 
   useFrame(() => {
     if (!animating.current || !targetPos.current) return;
@@ -66,6 +68,11 @@ function CameraFlyTo({ flyToTrigger }: { flyToTrigger: { location: string; id: n
       camera.lookAt(0, 0, 0);
       animating.current = false;
       targetPos.current = null;
+      // Re-enable orbit controls and reset their state
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true;
+        controlsRef.current.update();
+      }
       return;
     }
 
@@ -91,6 +98,8 @@ function Scene({
   flyToTrigger: { location: string; id: number } | null;
   carbonIntensity: Record<string, number>;
 }) {
+  const controlsRef = useRef<any>(null);
+
   return (
     <>
       <ambientLight intensity={1.6} />
@@ -99,8 +108,9 @@ function Scene({
       <pointLight position={[3, 8, -3]} intensity={0.3} color="hsl(168, 50%, 50%)" />
       <StylizedGlobe />
       <CountryOverlays value={value} onChange={onChange} disabled={disabled} carbonIntensity={carbonIntensity} />
-      <CameraFlyTo flyToTrigger={flyToTrigger} />
+      <CameraFlyTo flyToTrigger={flyToTrigger} controlsRef={controlsRef} />
       <OrbitControls
+        ref={controlsRef}
         enableZoom={false}
         enablePan={false}
         rotateSpeed={0.4}
@@ -134,22 +144,24 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
 
   return (
     <div className="bg-card border border-border rounded-lg shadow-card overflow-hidden">
-      <div className="flex h-[480px]">
-        {/* Location list panel */}
-        <div className="w-52 border-r border-border flex-shrink-0">
+      <div className="flex h-[480px] md:h-[360px] lg:h-[480px]">
+        {/* Location list panel - full width on mobile, fixed width on tablet/desktop */}
+        <div className="w-full md:w-44 lg:w-52 md:border-r border-border flex-shrink-0">
           <LocationList value={value} onChange={handleSelect} disabled={disabled} carbonIntensity={carbonIntensity} />
         </div>
 
-        {/* Globe */}
-        <div className="relative flex-1">
-          <Canvas
-            camera={{ position: [0, 1.5, CAMERA_DISTANCE], fov: 38 }}
-            style={{ background: "transparent" }}
-            gl={{ antialias: true, alpha: true }}
-          >
-            <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} carbonIntensity={carbonIntensity} />
-          </Canvas>
-          {/* Country name + live indicator - upper left */}
+        {/* Globe - hidden on mobile, centered & smaller on tablet, full on desktop */}
+        <div className="relative flex-1 hidden md:flex items-center justify-center">
+          <div className="w-[300px] h-[300px] lg:w-full lg:h-full">
+            <Canvas
+              camera={{ position: [0, 1.5, CAMERA_DISTANCE], fov: 38 }}
+              style={{ background: "transparent", width: "100%", height: "100%" }}
+              gl={{ antialias: true, alpha: true }}
+            >
+              <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} carbonIntensity={carbonIntensity} />
+            </Canvas>
+          </div>
+          {/* Country name - upper left */}
           <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
             <span className="w-2 h-2 rounded-full" style={{ background: intensityToColor(carbonIntensity[value] ?? 300).color }} />
             <span className="font-display font-medium text-foreground">{selectedLabel}</span>
