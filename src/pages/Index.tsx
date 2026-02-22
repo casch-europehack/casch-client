@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Leaf, Zap, ChevronDown, Clock, Play } from "lucide-react";
+import { Leaf, Zap, ChevronDown, Clock, Play, AlertCircle } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { AnalyzingSpinner } from "@/components/AnalyzingSpinner";
 import { EnergyChart } from "@/components/EnergyChart";
@@ -21,6 +21,7 @@ const Index = () => {
   const [location, setLocation] = useState("IE");
   const [co2Result, setCo2Result] = useState<CO2Result | null>(null);
   const [isLoadingCO2, setIsLoadingCO2] = useState(false);
+  const [co2Error, setCo2Error] = useState(false);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [aggregatedResult, setAggregatedResult] = useState<AggregatedCO2Result | null>(null);
@@ -38,17 +39,21 @@ const Index = () => {
     setCo2Result(null);
     setAggregatedResult(null);
     setAdvancedOpen(false);
+    setCo2Error(false);
+    setLocation("IE");
+    setScheduleLocation("IE");
 
     try {
       const result = await analyzeFile(selectedFile);
       setProfilingResult(result);
 
       setIsLoadingCO2(true);
+      setCo2Error(false);
       try {
         const co2 = await getCO2Emissions(result.file_hash, "IE");
         setCo2Result(co2);
       } catch (err) {
-        toast({ title: "CO₂ data unavailable", description: "Could not fetch emissions data. Try changing location.", variant: "destructive" });
+        setCo2Error(true);
       } finally {
         setIsLoadingCO2(false);
       }
@@ -61,19 +66,37 @@ const Index = () => {
 
   const handleLocationChange = useCallback(async (newLocation: string) => {
     setLocation(newLocation);
-    setAdvancedOpen(false);
-    setAggregatedResult(null);
+    setScheduleLocation(newLocation);
+    setCo2Error(false);
     if (!profilingResult) return;
+    
     setIsLoadingCO2(true);
+    if (advancedOpen) {
+      setIsLoadingAggregated(true);
+    }
+
     try {
       const co2 = await getCO2Emissions(profilingResult.file_hash, newLocation);
       setCo2Result(co2);
     } catch (err) {
-      toast({ title: "CO₂ data unavailable", description: "Could not fetch emissions data for this location.", variant: "destructive" });
+      setCo2Error(true);
+      setCo2Result(null);
     } finally {
       setIsLoadingCO2(false);
     }
-  }, [profilingResult, toast]);
+
+    if (advancedOpen) {
+      const minTime = profilingResult.estimated_total_time_s / 3600;
+      try {
+        const agg = await getAggregatedCO2(profilingResult.file_hash, newLocation, minTime);
+        setAggregatedResult(agg);
+      } catch (err) {
+        setAggregatedResult(null);
+      } finally {
+        setIsLoadingAggregated(false);
+      }
+    }
+  }, [profilingResult, advancedOpen]);
 
   const handleAdvancedToggle = useCallback(async () => {
     const willOpen = !advancedOpen;
@@ -94,17 +117,19 @@ const Index = () => {
   }, [advancedOpen, aggregatedResult, profilingResult, location, toast]);
 
   const handleSchedule = useCallback(async () => {
-    if (!profilingResult || !selectedPolicy) return;
+    if (!profilingResult) return;
+    if (aggregatedResult && !co2Error && !selectedPolicy) return;
     setIsScheduling(true);
     try {
-      const result = await scheduleJob(profilingResult.file_hash, scheduleLocation, selectedPolicy);
+      const policyToUse = (aggregatedResult && !co2Error && selectedPolicy) ? selectedPolicy : "default";
+      const result = await scheduleJob(profilingResult.file_hash, scheduleLocation, policyToUse);
       toast({ title: "Job Scheduled!", description: result.message });
     } catch (err) {
       toast({ title: "Scheduling failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
     } finally {
       setIsScheduling(false);
     }
-  }, [profilingResult, selectedPolicy, scheduleLocation, toast]);
+  }, [profilingResult, selectedPolicy, scheduleLocation, aggregatedResult, co2Error, toast]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,16 +199,23 @@ const Index = () => {
             {/* Energy chart */}
             <EnergyChart data={profilingResult} />
 
+            {/* CO2 Error Banner */}
+            {co2Error && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-4 flex items-center gap-3 text-sm">
+                <AlertCircle className="w-4 h-4" />
+                <span>CO₂ emissions data is currently unavailable for this location. Please try another location.</span>
+              </div>
+            )}
+
             {/* CO2 chart */}
-            {isLoadingCO2 && (
-              <div className="bg-card border border-border rounded-lg p-12 flex items-center justify-center">
+            {isLoadingCO2 ? (
+              <div className="h-[360px] bg-card border border-border rounded-lg flex items-center justify-center">
                 <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                 <span className="ml-3 text-sm text-muted-foreground">Loading emissions data…</span>
               </div>
-            )}
-            {co2Result && !isLoadingCO2 && (
+            ) : co2Result ? (
               <CO2Chart profilingData={profilingResult} co2Data={co2Result} />
-            )}
+            ) : null}
 
             {/* Advanced section */}
             <div className="border border-border rounded-lg overflow-hidden">
@@ -200,28 +232,28 @@ const Index = () => {
 
               {advancedOpen && (
                 <div className="p-4 bg-card/50 space-y-6 border-t border-border">
-                  {isLoadingAggregated && (
-                    <div className="flex items-center justify-center py-12">
+                  {isLoadingAggregated ? (
+                    <div className="flex items-center justify-center py-12 h-[400px]">
                       <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                       <span className="ml-3 text-sm text-muted-foreground">Computing optimization data…</span>
                     </div>
-                  )}
+                  ) : aggregatedResult ? (
+                    <AggregatedCO2Chart data={aggregatedResult} />
+                  ) : null}
 
-                  {aggregatedResult && !isLoadingAggregated && (
-                    <>
-                      <AggregatedCO2Chart data={aggregatedResult} />
-
-                      {/* Schedule section */}
-                      <div className="bg-card border border-border rounded-lg p-6 shadow-soft">
-                        <h4 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-                          <Play className="w-4 h-4 text-primary" />
-                          Schedule Your Job
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1.5 block">Location</label>
-                            <LocationSelector value={scheduleLocation} onChange={setScheduleLocation} />
-                          </div>
+                  {/* Schedule section */}
+                  <div className="bg-card border border-border rounded-lg p-6 shadow-soft">
+                    <h4 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Play className="w-4 h-4 text-primary" />
+                      Schedule Your Job
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1.5 block">Location</label>
+                        <LocationSelector value={scheduleLocation} onChange={setScheduleLocation} />
+                      </div>
+                      {aggregatedResult && !co2Error && (
+                        <>
                           <div>
                             <label className="text-xs text-muted-foreground mb-1.5 block">Min execution time (h)</label>
                             <Input
@@ -248,17 +280,17 @@ const Index = () => {
                               ))}
                             </select>
                           </div>
-                        </div>
-                        <Button
-                          onClick={handleSchedule}
-                          disabled={!selectedPolicy || isScheduling}
-                          className="mt-4 gradient-eco text-primary-foreground hover:opacity-90"
-                        >
-                          {isScheduling ? "Scheduling…" : "Schedule Job"}
-                        </Button>
-                      </div>
-                    </>
-                  )}
+                        </>
+                      )}
+                    </div>
+                    <Button
+                      onClick={handleSchedule}
+                      disabled={isScheduling || (aggregatedResult && !co2Error && !selectedPolicy)}
+                      className="mt-4 gradient-eco text-primary-foreground hover:opacity-90"
+                    >
+                      {isScheduling ? "Scheduling…" : "Schedule Job"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

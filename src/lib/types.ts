@@ -1,6 +1,13 @@
 // API configuration - point this to your Python server
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+export interface ProfilingResponse {
+  status: string;
+  message: string;
+  file_hash: string;
+  result: ProfilingResult;
+}
+
 export interface ProfilingResult {
   profiled_epochs: number;
   steps_per_epoch: number;
