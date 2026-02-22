@@ -111,17 +111,35 @@ export function generateMockProfiling(): ProfilingResult {
 export function generateMockCO2(profiling: ProfilingResult, location: string): CO2Result {
   const intensity = CARBON_INTENSITY[location] || 300;
   
-  // CO2 per step = energy_J * (1 Wh / 3600 J) * (1 kWh / 1000 Wh) * intensity
-  const co2_per_step = profiling.step_energy_J.map(
-    (e) => (e / 3600 / 1000) * intensity
-  );
-  const total_co2_g = co2_per_step.reduce((a, b) => a + b, 0);
-
+  const job_duration_s = profiling.estimated_total_time_s;
+  const baseline_co2 = (profiling.estimated_total_energy_Wh / 1000) * intensity;
+  const optimised_co2 = baseline_co2 * 0.032; // 96.8% savings
+  
   return {
-    co2_per_step,
-    total_co2_g,
-    location: LOCATION_NAMES[location] || location,
-    carbon_intensity_gCO2_per_kWh: intensity,
+    location: location,
+    job_duration_s: job_duration_s,
+    delta_s: 10.0,
+    num_pauses: 5,
+    baseline_co2: baseline_co2,
+    optimised_co2: optimised_co2,
+    savings_co2: baseline_co2 - optimised_co2,
+    savings_pct: 96.8,
+    pause_positions_s: [1.22, 10.74, 19.31, 24.57, 31.49],
+    policy: [
+      { start: 0.0, end: 1.22, throttle: 1.0 },
+      { start: 1.22, end: 11.22, throttle: 0.0 },
+      { start: 11.22, end: 20.74, throttle: 1.0 },
+      { start: 20.74, end: 30.74, throttle: 0.0 },
+      { start: 30.74, end: 39.31, throttle: 1.0 },
+      { start: 39.31, end: 49.31, throttle: 0.0 },
+      { start: 49.31, end: 54.57, throttle: 1.0 },
+      { start: 54.57, end: 64.57, throttle: 0.0 },
+      { start: 64.57, end: 71.49, throttle: 1.0 },
+      { start: 71.49, end: 81.49, throttle: 0.0 },
+      { start: 81.49, end: 101.22, throttle: 1.0 }
+    ],
+    ci_times_s: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+    ci_values: [300, 290, 280, 270, 260, 250, 240, 230, 220, 210, 200]
   };
 }
 
@@ -152,6 +170,16 @@ export function generateMockAggregatedCO2(
   const optimalIdx = Math.floor(points * 0.6);
 
   return {
+    file_hash: profiling.file_hash,
+    location: location,
+    job_duration_s: profiling.estimated_total_time_s,
+    delta_s: 10.0,
+    num_optimal_pauses: 5,
+    baseline_co2: baseCO2,
+    optimised_co2: total_co2_g[optimalIdx],
+    durations: execution_times_h.map(h => h * 3600),
+    co2_emissions: total_co2_g,
+    policy_ids: execution_times_h.map((_, i) => `policy_${i}`),
     execution_times_h,
     total_co2_g,
     optimal_time_h: execution_times_h[optimalIdx],

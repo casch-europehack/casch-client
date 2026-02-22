@@ -30,7 +30,7 @@ export function EnergyChart({ data }: EnergyChartProps) {
           Power Consumption
         </h3>
         <p className="text-sm text-muted-foreground">
-          Instantaneous power output over time
+          Estimated power consumption across the job
         </p>
       </div>
       <div className="h-72">

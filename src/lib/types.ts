@@ -28,20 +28,53 @@ export interface ProfilingResult {
   file_hash: string;
 }
 
+export interface CO2Response {
+  status: string;
+  result: CO2Result;
+}
+
 export interface CO2Result {
-  co2_per_step: number[];
-  total_co2_g: number;
   location: string;
-  carbon_intensity_gCO2_per_kWh: number;
+  job_duration_s: number;
+  delta_s: number;
+  num_pauses: number;
+  baseline_co2: number;
+  optimised_co2: number;
+  savings_co2: number;
+  savings_pct: number;
+  pause_positions_s: number[];
+  policy: {
+    start: number;
+    end: number;
+    throttle: number;
+  }[];
+  ci_times_s: number[];
+  ci_values: number[];
 }
 
 export interface AggregatedCO2Result {
+  file_hash: string;
+  location: string;
+  job_duration_s: number;
+  delta_s: number;
+  num_optimal_pauses: number;
+  baseline_co2: number;
+  optimised_co2: number;
+  durations: number[];
+  co2_emissions: number[];
+  policy_ids: string[];
+  
+  // Computed fields for frontend
   execution_times_h: number[];
   total_co2_g: number[];
   optimal_time_h: number;
   optimal_co2_g: number;
   household_daily_co2_g: number;
   policies: { name: string; time_h: number; co2_g: number }[];
+}
+
+export interface CarbonIntensityMap {
+  [zone: string]: number | null;
 }
 
 export const LOCATIONS = [

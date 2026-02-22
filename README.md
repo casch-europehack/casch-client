@@ -1,8 +1,4 @@
-# Welcome to your Lovable project
-
-## Project info
-
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+# Welcome to your Lovable project!
 
 ## How can I edit this code?
 
@@ -10,7 +6,7 @@ There are several ways of editing your application.
 
 **Use Lovable**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Simply visit the [Lovable Project](https://lovable.dev/projects/ada85c31-9029-4b9f-962c-fd035ba31dce) and start prompting.
 
 Changes made via Lovable will be committed automatically to this repo.
 
@@ -59,6 +55,14 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+
+# How to configure the project?
+
+Add our server url.
+
+```
+VITE_API_BASE_URL=https://<servier_url>
+```
 
 ## How can I deploy this project?
 

@@ -194,9 +194,10 @@ interface CountryOverlaysProps {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  carbonIntensity?: Record<string, number>;
 }
 
-export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysProps) {
+export function CountryOverlays({ value, onChange, disabled, carbonIntensity }: CountryOverlaysProps) {
   const [countryFeatures, setCountryFeatures] = useState<GeoFeature[] | null>(null);
   const [stateFeatures, setStateFeatures] = useState<GeoFeature[] | null>(null);
   const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
@@ -251,7 +252,8 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
         const isSelected = value === location.value;
         const isHovered = hoveredLocation === location.value;
 
-        const intensity = CARBON_INTENSITY[location.value] || 300;
+        const ci = carbonIntensity ?? CARBON_INTENSITY;
+        const intensity = ci[location.value] ?? 300;
         const intColor = intensityToColor(intensity);
 
         return (

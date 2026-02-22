@@ -3,8 +3,9 @@ import { Crosshair } from "lucide-react";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import { CountryOverlays, LOCATIONS, latLngToVector3, CARBON_INTENSITY, intensityToColor } from "./CountryOverlay";
+import { CountryOverlays, LOCATIONS, latLngToVector3, intensityToColor } from "./CountryOverlay";
 import { LocationList } from "./LocationList";
+import { useCarbonIntensity } from "@/hooks/use-carbon-intensity";
 
 const GLOBE_RADIUS = 2;
 const CAMERA_DISTANCE = 6.2;
@@ -82,11 +83,13 @@ function Scene({
   onChange,
   disabled,
   flyToTrigger,
+  carbonIntensity,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   flyToTrigger: { location: string; id: number } | null;
+  carbonIntensity: Record<string, number>;
 }) {
   return (
     <>
@@ -95,7 +98,7 @@ function Scene({
       <pointLight position={[-10, -5, -10]} intensity={0.4} color="hsl(200, 60%, 60%)" />
       <pointLight position={[3, 8, -3]} intensity={0.3} color="hsl(168, 50%, 50%)" />
       <StylizedGlobe />
-      <CountryOverlays value={value} onChange={onChange} disabled={disabled} />
+      <CountryOverlays value={value} onChange={onChange} disabled={disabled} carbonIntensity={carbonIntensity} />
       <CameraFlyTo flyToTrigger={flyToTrigger} />
       <OrbitControls
         enableZoom={false}
@@ -118,6 +121,7 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
   const selectedLabel = LOCATIONS.find((l) => l.value === value)?.label ?? value;
   const triggerIdRef = useRef(0);
   const [flyToTrigger, setFlyToTrigger] = useState<{ location: string; id: number } | null>(null);
+  const { carbonIntensity, isLive } = useCarbonIntensity();
 
   const handleSelect = useCallback(
     (newValue: string) => {
@@ -133,7 +137,7 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
       <div className="flex h-[480px]">
         {/* Location list panel */}
         <div className="w-52 border-r border-border flex-shrink-0">
-          <LocationList value={value} onChange={handleSelect} disabled={disabled} />
+          <LocationList value={value} onChange={handleSelect} disabled={disabled} carbonIntensity={carbonIntensity} />
         </div>
 
         {/* Globe */}
@@ -143,12 +147,15 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
             style={{ background: "transparent" }}
             gl={{ antialias: true, alpha: true }}
           >
-            <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} />
+            <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} carbonIntensity={carbonIntensity} />
           </Canvas>
-          {/* Country name - upper left */}
+          {/* Country name + live indicator - upper left */}
           <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
-            <span className="w-2 h-2 rounded-full" style={{ background: intensityToColor(CARBON_INTENSITY[value] || 300).color }} />
+            <span className="w-2 h-2 rounded-full" style={{ background: intensityToColor(carbonIntensity[value] ?? 300).color }} />
             <span className="font-display font-medium text-foreground">{selectedLabel}</span>
+            {isLive && (
+              <span className="ml-1 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Live data from Electricity Maps" />
+            )}
           </div>
           {/* Recenter button - upper right */}
           <button

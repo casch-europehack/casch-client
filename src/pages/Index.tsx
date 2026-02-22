@@ -1,14 +1,12 @@
 import { useState, useCallback } from "react";
-import { Leaf, Zap, ChevronDown, Clock, Play, AlertCircle } from "lucide-react";
+import { Leaf, Zap, ChevronDown, Play, AlertCircle } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { AnalyzingSpinner } from "@/components/AnalyzingSpinner";
 import { EnergyChart } from "@/components/EnergyChart";
 import { CO2Chart } from "@/components/CO2Chart";
 import { AggregatedCO2Chart } from "@/components/AggregatedCO2Chart";
 import { GlobeSelector } from "@/components/GlobeSelector";
-import { LocationSelector } from "@/components/LocationSelector";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { analyzeFile, getCO2Emissions, getAggregatedCO2, scheduleJob } from "@/lib/api";
 import { ProfilingResult, CO2Result, AggregatedCO2Result } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -27,11 +25,27 @@ const Index = () => {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [aggregatedResult, setAggregatedResult] = useState<AggregatedCO2Result | null>(null);
   const [isLoadingAggregated, setIsLoadingAggregated] = useState(false);
+  const [aggregateError, setAggregateError] = useState(false);
 
-  const [scheduleLocation, setScheduleLocation] = useState("IE");
-  const [scheduleMinTime, setScheduleMinTime] = useState("");
   const [selectedPolicy, setSelectedPolicy] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
+
+  const fetchAggregate = useCallback(async (fileHash: string, loc: string, estimatedTimeS: number) => {
+    setIsLoadingAggregated(true);
+    setAggregateError(false);
+    setSelectedPolicy("");
+    try {
+      const minTime = estimatedTimeS / 3600;
+      const agg = await getAggregatedCO2(fileHash, loc, minTime);
+      setAggregatedResult(agg);
+    } catch (err) {
+      console.error("Aggregate API failed:", err);
+      setAggregatedResult(null);
+      setAggregateError(true);
+    } finally {
+      setIsLoadingAggregated(false);
+    }
+  }, []);
 
   const handleAnalyze = useCallback(async () => {
     if (!selectedFile) return;
@@ -41,8 +55,9 @@ const Index = () => {
     setAggregatedResult(null);
     setAdvancedOpen(false);
     setCo2Error(false);
+    setAggregateError(false);
+    setSelectedPolicy("");
     setLocation("IE");
-    setScheduleLocation("IE");
 
     try {
       const result = await analyzeFile(selectedFile);
@@ -53,7 +68,7 @@ const Index = () => {
       try {
         const co2 = await getCO2Emissions(result.file_hash, "IE");
         setCo2Result(co2);
-      } catch (err) {
+      } catch {
         setCo2Error(true);
       } finally {
         setIsLoadingCO2(false);
@@ -67,19 +82,15 @@ const Index = () => {
 
   const handleLocationChange = useCallback(async (newLocation: string) => {
     setLocation(newLocation);
-    setScheduleLocation(newLocation);
     setCo2Error(false);
+    setSelectedPolicy("");
     if (!profilingResult) return;
-    
-    setIsLoadingCO2(true);
-    if (advancedOpen) {
-      setIsLoadingAggregated(true);
-    }
 
+    setIsLoadingCO2(true);
     try {
       const co2 = await getCO2Emissions(profilingResult.file_hash, newLocation);
       setCo2Result(co2);
-    } catch (err) {
+    } catch {
       setCo2Error(true);
       setCo2Result(null);
     } finally {
@@ -87,50 +98,33 @@ const Index = () => {
     }
 
     if (advancedOpen) {
-      const minTime = profilingResult.estimated_total_time_s / 3600;
-      try {
-        const agg = await getAggregatedCO2(profilingResult.file_hash, newLocation, minTime);
-        setAggregatedResult(agg);
-      } catch (err) {
-        setAggregatedResult(null);
-      } finally {
-        setIsLoadingAggregated(false);
-      }
+      await fetchAggregate(profilingResult.file_hash, newLocation, profilingResult.estimated_total_time_s);
     }
-  }, [profilingResult, advancedOpen]);
+  }, [profilingResult, advancedOpen, fetchAggregate]);
 
   const handleAdvancedToggle = useCallback(async () => {
     const willOpen = !advancedOpen;
     setAdvancedOpen(willOpen);
 
-    if (willOpen && !aggregatedResult && profilingResult) {
-      setIsLoadingAggregated(true);
-      const minTime = profilingResult.estimated_total_time_s / 3600;
-      try {
-        const agg = await getAggregatedCO2(profilingResult.file_hash, location, minTime);
-        setAggregatedResult(agg);
-      } catch (err) {
-        toast({ title: "Could not load advanced data", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
-      } finally {
-        setIsLoadingAggregated(false);
-      }
+    if (willOpen && profilingResult) {
+      await fetchAggregate(profilingResult.file_hash, location, profilingResult.estimated_total_time_s);
     }
-  }, [advancedOpen, aggregatedResult, profilingResult, location, toast]);
+  }, [advancedOpen, profilingResult, location, fetchAggregate]);
 
   const handleSchedule = useCallback(async () => {
-    if (!profilingResult) return;
-    if (aggregatedResult && !co2Error && !selectedPolicy) return;
+    if (!profilingResult || !selectedFile) return;
+    if (advancedOpen && aggregatedResult && !selectedPolicy) return;
+    const policyToUse = (advancedOpen && selectedPolicy) ? selectedPolicy : "baseline";
     setIsScheduling(true);
     try {
-      const policyToUse = (aggregatedResult && !co2Error && selectedPolicy) ? selectedPolicy : "default";
-      const result = await scheduleJob(profilingResult.file_hash, scheduleLocation, policyToUse);
+      const result = await scheduleJob(selectedFile, location, policyToUse);
       toast({ title: "Job Scheduled!", description: result.message });
     } catch (err) {
       toast({ title: "Scheduling failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
     } finally {
       setIsScheduling(false);
     }
-  }, [profilingResult, selectedPolicy, scheduleLocation, aggregatedResult, co2Error, toast]);
+  }, [profilingResult, selectedFile, selectedPolicy, location, aggregatedResult, toast, advancedOpen]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,85 +209,77 @@ const Index = () => {
                 <span className="ml-3 text-sm text-muted-foreground">Loading emissions data…</span>
               </div>
             ) : co2Result ? (
-              <CO2Chart profilingData={profilingResult} co2Data={co2Result} />
+              <CO2Chart co2Data={co2Result} />
             ) : null}
 
-            {/* Advanced section */}
-            <div className="border border-border rounded-lg overflow-hidden">
-              <button
-                onClick={handleAdvancedToggle}
-                className="w-full flex items-center justify-between p-4 bg-card hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <span className="font-display font-semibold text-foreground text-sm">Advanced: Scheduling & Optimization</span>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-              </button>
+            {/* Scheduling Section */}
+            <div className="bg-card border border-border rounded-lg p-6 shadow-soft animate-slide-up">
+              <h4 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Play className="w-4 h-4 text-primary" />
+                Schedule Your Job
+              </h4>
 
-              {advancedOpen && (
-                <div className="p-4 bg-card/50 space-y-6 border-t border-border">
-                  {isLoadingAggregated ? (
-                    <div className="flex items-center justify-center py-12 h-[400px]">
-                      <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                      <span className="ml-3 text-sm text-muted-foreground">Computing optimization data…</span>
-                    </div>
-                  ) : aggregatedResult ? (
-                    <AggregatedCO2Chart data={aggregatedResult} />
-                  ) : null}
-
-                  {/* Schedule section */}
-                  <div className="bg-card border border-border rounded-lg p-6 shadow-soft">
-                    <h4 className="font-display font-semibold text-foreground mb-4 flex items-center gap-2">
-                      <Play className="w-4 h-4 text-primary" />
-                      Schedule Your Job
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-xs text-muted-foreground mb-1.5 block">Location</label>
-                        <LocationSelector value={scheduleLocation} onChange={setScheduleLocation} />
-                      </div>
-                      {aggregatedResult && !co2Error && (
-                        <>
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1.5 block">Min execution time (h)</label>
-                            <Input
-                              type="number"
-                              min={(profilingResult.estimated_total_time_s / 3600).toFixed(1)}
-                              step="0.5"
-                              value={scheduleMinTime}
-                              onChange={(e) => setScheduleMinTime(e.target.value)}
-                              placeholder={(profilingResult.estimated_total_time_s / 3600).toFixed(1)}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted-foreground mb-1.5 block">Policy</label>
-                            <select
-                              value={selectedPolicy}
-                              onChange={(e) => setSelectedPolicy(e.target.value)}
-                              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                            >
-                              <option value="">Select policy</option>
-                              {aggregatedResult.policies.map((p) => (
-                                <option key={p.name} value={p.name}>
-                                  {p.name} ({p.time_h.toFixed(1)}h · {p.co2_g.toFixed(1)}g CO₂)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <Button
-                      onClick={handleSchedule}
-                      disabled={isScheduling || (aggregatedResult && !co2Error && !selectedPolicy)}
-                      className="mt-4 gradient-eco text-primary-foreground hover:opacity-90"
-                    >
-                      {isScheduling ? "Scheduling…" : "Schedule Job"}
-                    </Button>
+              {/* Banner */}
+              {co2Result && !co2Error && (
+                <div className="mb-4">
+                  <div className="bg-primary/10 border border-primary/20 text-primary rounded-lg p-4 flex items-center gap-3 text-sm font-medium">
+                    <Leaf className="w-5 h-5" />
+                    <span>
+                      You can reduce your carbon emissions by {co2Result.savings_pct.toFixed(1)}% ({co2Result.savings_co2.toFixed(1)} gCO₂) by slowing down your job.
+                    </span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2 ml-1">
+                    For even further reductions, consider changing the location!
+                  </p>
                 </div>
               )}
+
+              {/* Expand / Collapse trade-off section */}
+              <div className="mb-4">
+                <button
+                  onClick={handleAdvancedToggle}
+                  className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
+                >
+                  {advancedOpen ? "Hide trade-off analysis" : "Show duration vs CO₂ trade-off"}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+                </button>
+              </div>
+
+              {/* Trade-off section */}
+              {advancedOpen && (
+                <div className="space-y-6 mb-6 border-t border-border pt-4">
+                  {isLoadingAggregated ? (
+                    <div className="flex items-center justify-center py-12 h-[300px]">
+                      <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                      <span className="ml-3 text-sm text-muted-foreground">Computing optimization trade-offs…</span>
+                    </div>
+                  ) : aggregateError ? (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-4 flex items-center gap-3 text-sm">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Failed to load trade-off data. Please try again or select a different location.</span>
+                    </div>
+                  ) : aggregatedResult ? (
+                    <AggregatedCO2Chart
+                      data={aggregatedResult}
+                      selectedPolicy={selectedPolicy}
+                      onSelectPolicy={setSelectedPolicy}
+                    />
+                  ) : null}
+                </div>
+              )}
+
+              <Button
+                onClick={handleSchedule}
+                disabled={isScheduling || (advancedOpen && isLoadingAggregated) || (advancedOpen && aggregatedResult && !selectedPolicy)}
+                className="w-full sm:w-auto gradient-eco text-primary-foreground hover:opacity-90"
+              >
+                {isScheduling
+                  ? "Scheduling…"
+                  : selectedPolicy
+                    ? `Schedule with ${selectedPolicy}`
+                    : "Schedule Job"
+                }
+              </Button>
             </div>
 
             {/* Back button */}
@@ -305,6 +291,7 @@ const Index = () => {
                   setCo2Result(null);
                   setAggregatedResult(null);
                   setAdvancedOpen(false);
+                  setSelectedPolicy("");
                   setSelectedFile(null);
                 }}
               >
