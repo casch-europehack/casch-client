@@ -140,21 +140,23 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
 
   return (
     <div className="bg-card border border-border rounded-lg shadow-card overflow-hidden">
-      <div className="flex h-[480px] md:h-[480px]">
-        {/* Location list panel - full width on mobile, fixed width on desktop */}
-        <div className="w-full md:w-52 md:border-r border-border flex-shrink-0">
+      <div className="flex h-[480px] md:h-[360px] lg:h-[480px]">
+        {/* Location list panel - full width on mobile, fixed width on tablet/desktop */}
+        <div className="w-full md:w-44 lg:w-52 md:border-r border-border flex-shrink-0">
           <LocationList value={value} onChange={handleSelect} disabled={disabled} />
         </div>
 
-        {/* Globe - hidden on mobile */}
-        <div className="relative flex-1 hidden md:block">
-          <Canvas
-            camera={{ position: [0, 1.5, CAMERA_DISTANCE], fov: 38 }}
-            style={{ background: "transparent" }}
-            gl={{ antialias: true, alpha: true }}
-          >
-            <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} />
-          </Canvas>
+        {/* Globe - hidden on mobile, centered & smaller on tablet, full on desktop */}
+        <div className="relative flex-1 hidden md:flex items-center justify-center">
+          <div className="w-[300px] h-[300px] lg:w-full lg:h-full">
+            <Canvas
+              camera={{ position: [0, 1.5, CAMERA_DISTANCE], fov: 38 }}
+              style={{ background: "transparent", width: "100%", height: "100%" }}
+              gl={{ antialias: true, alpha: true }}
+            >
+              <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} />
+            </Canvas>
+          </div>
           {/* Country name - upper left */}
           <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
             <span className="w-2 h-2 rounded-full" style={{ background: intensityToColor(CARBON_INTENSITY[value] || 300).color }} />
