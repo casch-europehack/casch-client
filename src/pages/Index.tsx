@@ -59,45 +59,52 @@ const Index = () => {
         setIsLoadingCO2(false);
       }
     } catch (err) {
-      toast({ title: "Analysis failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
+      toast({
+        title: "Analysis failed",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setIsAnalyzing(false);
     }
   }, [selectedFile, toast]);
 
-  const handleLocationChange = useCallback(async (newLocation: string) => {
-    setLocation(newLocation);
-    setScheduleLocation(newLocation);
-    setCo2Error(false);
-    if (!profilingResult) return;
-    
-    setIsLoadingCO2(true);
-    if (advancedOpen) {
-      setIsLoadingAggregated(true);
-    }
+  const handleLocationChange = useCallback(
+    async (newLocation: string) => {
+      setLocation(newLocation);
+      setScheduleLocation(newLocation);
+      setCo2Error(false);
+      if (!profilingResult) return;
 
-    try {
-      const co2 = await getCO2Emissions(profilingResult.file_hash, newLocation);
-      setCo2Result(co2);
-    } catch (err) {
-      setCo2Error(true);
-      setCo2Result(null);
-    } finally {
-      setIsLoadingCO2(false);
-    }
-
-    if (advancedOpen) {
-      const minTime = profilingResult.estimated_total_time_s / 3600;
-      try {
-        const agg = await getAggregatedCO2(profilingResult.file_hash, newLocation, minTime);
-        setAggregatedResult(agg);
-      } catch (err) {
-        setAggregatedResult(null);
-      } finally {
-        setIsLoadingAggregated(false);
+      setIsLoadingCO2(true);
+      if (advancedOpen) {
+        setIsLoadingAggregated(true);
       }
-    }
-  }, [profilingResult, advancedOpen]);
+
+      try {
+        const co2 = await getCO2Emissions(profilingResult.file_hash, newLocation);
+        setCo2Result(co2);
+      } catch (err) {
+        setCo2Error(true);
+        setCo2Result(null);
+      } finally {
+        setIsLoadingCO2(false);
+      }
+
+      if (advancedOpen) {
+        const minTime = profilingResult.estimated_total_time_s / 3600;
+        try {
+          const agg = await getAggregatedCO2(profilingResult.file_hash, newLocation, minTime);
+          setAggregatedResult(agg);
+        } catch (err) {
+          setAggregatedResult(null);
+        } finally {
+          setIsLoadingAggregated(false);
+        }
+      }
+    },
+    [profilingResult, advancedOpen],
+  );
 
   const handleAdvancedToggle = useCallback(async () => {
     const willOpen = !advancedOpen;
@@ -110,7 +117,11 @@ const Index = () => {
         const agg = await getAggregatedCO2(profilingResult.file_hash, location, minTime);
         setAggregatedResult(agg);
       } catch (err) {
-        toast({ title: "Could not load advanced data", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
+        toast({
+          title: "Could not load advanced data",
+          description: err instanceof Error ? err.message : "Something went wrong",
+          variant: "destructive",
+        });
       } finally {
         setIsLoadingAggregated(false);
       }
@@ -122,11 +133,15 @@ const Index = () => {
     if (aggregatedResult && !co2Error && !selectedPolicy) return;
     setIsScheduling(true);
     try {
-      const policyToUse = (aggregatedResult && !co2Error && selectedPolicy) ? selectedPolicy : "default";
+      const policyToUse = aggregatedResult && !co2Error && selectedPolicy ? selectedPolicy : "default";
       const result = await scheduleJob(profilingResult.file_hash, scheduleLocation, policyToUse);
       toast({ title: "Job Scheduled!", description: result.message });
     } catch (err) {
-      toast({ title: "Scheduling failed", description: err instanceof Error ? err.message : "Something went wrong", variant: "destructive" });
+      toast({
+        title: "Scheduling failed",
+        description: err instanceof Error ? err.message : "Something went wrong",
+        variant: "destructive",
+      });
     } finally {
       setIsScheduling(false);
     }
@@ -141,12 +156,8 @@ const Index = () => {
             <Leaf className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-display font-bold text-foreground leading-tight">
-              Casch
-            </h1>
-            <p className="text-[11px] text-muted-foreground leading-tight">
-              ML training carbon profiler
-            </p>
+            <h1 className="text-lg font-display font-bold text-foreground leading-tight">CaSch</h1>
+            <p className="text-[11px] text-muted-foreground leading-tight">ML training carbon profiler</p>
           </div>
         </div>
       </header>
@@ -160,12 +171,10 @@ const Index = () => {
                 <Zap className="w-3.5 h-3.5" />
                 Understand your training's carbon footprint
               </div>
-              <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground">
-                Profile. Measure. Reduce.
-              </h2>
+              <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground">Profile. Measure. Reduce.</h2>
               <p className="text-muted-foreground mt-3 max-w-md mx-auto">
-                Upload your PyTorch training script and discover the environmental
-                impact of your ML workloads — then optimize.
+                Upload your PyTorch training script and discover the environmental impact of your ML workloads — then
+                optimize.
               </p>
             </div>
             <FileUpload
@@ -192,9 +201,7 @@ const Index = () => {
               <span className="font-display font-semibold text-foreground">
                 {profilingResult.total_epochs} epochs · {profilingResult.total_steps.toLocaleString()} steps
               </span>
-              <span className="text-muted-foreground">
-                (profiled {profilingResult.profiled_epochs} epochs)
-              </span>
+              <span className="text-muted-foreground">(profiled {profilingResult.profiled_epochs} epochs)</span>
             </div>
 
             {/* Energy chart */}
@@ -226,9 +233,13 @@ const Index = () => {
               >
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-primary" />
-                  <span className="font-display font-semibold text-foreground text-sm">Advanced: Scheduling & Optimization</span>
+                  <span className="font-display font-semibold text-foreground text-sm">
+                    Advanced: Scheduling & Optimization
+                  </span>
                 </div>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  className={`w-4 h-4 text-muted-foreground transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+                />
               </button>
 
               {advancedOpen && (
