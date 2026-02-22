@@ -9,7 +9,7 @@ const GLOBE_RADIUS = 2;
 const CAMERA_DISTANCE = 6.2;
 
 function StylizedGlobe() {
-  const texture = useLoader(THREE.TextureLoader, "/8081_earthmap10k.jpg");
+  const texture = useLoader(THREE.TextureLoader, "/earth-texture.jpg");
 
   return (
     <group>
