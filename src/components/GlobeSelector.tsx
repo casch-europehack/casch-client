@@ -140,14 +140,14 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
 
   return (
     <div className="bg-card border border-border rounded-lg shadow-card overflow-hidden">
-      <div className="flex h-[480px]">
-        {/* Location list panel */}
-        <div className="w-52 border-r border-border flex-shrink-0">
+      <div className="flex h-[480px] md:h-[480px]">
+        {/* Location list panel - full width on mobile, fixed width on desktop */}
+        <div className="w-full md:w-52 md:border-r border-border flex-shrink-0">
           <LocationList value={value} onChange={handleSelect} disabled={disabled} />
         </div>
 
-        {/* Globe */}
-        <div className="relative flex-1">
+        {/* Globe - hidden on mobile */}
+        <div className="relative flex-1 hidden md:block">
           <Canvas
             camera={{ position: [0, 1.5, CAMERA_DISTANCE], fov: 38 }}
             style={{ background: "transparent" }}
