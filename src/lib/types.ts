@@ -16,6 +16,8 @@ export interface ProfilingResult {
   profiled_step_time_s: number[];
   step_energy_J: number[];
   step_time_s: number[];
+  power_timeseries: { time_s: number[]; power_W: number[] };
+  power_intervals: { start_time_s: number[]; end_time_s: number[]; power_W: number[] };
   file_hash: string;
 }
 
