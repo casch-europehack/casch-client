@@ -1,5 +1,5 @@
 import { useRef, useState, useMemo, useCallback } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -34,33 +34,6 @@ function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector
   );
 }
 
-function generateGlobeLines(radius: number): THREE.BufferGeometry[] {
-  const geometries: THREE.BufferGeometry[] = [];
-  const segments = 96;
-
-  // Latitude lines every 30 degrees
-  for (let lat = -60; lat <= 60; lat += 30) {
-    const points: THREE.Vector3[] = [];
-    for (let i = 0; i <= segments; i++) {
-      const lng = (i / segments) * 360 - 180;
-      points.push(latLngToVector3(lat, lng, radius));
-    }
-    geometries.push(new THREE.BufferGeometry().setFromPoints(points));
-  }
-
-  // Longitude lines every 30 degrees
-  for (let lng = -180; lng < 180; lng += 30) {
-    const points: THREE.Vector3[] = [];
-    for (let i = 0; i <= segments; i++) {
-      const lat = (i / segments) * 180 - 90;
-      points.push(latLngToVector3(lat, lng, radius));
-    }
-    geometries.push(new THREE.BufferGeometry().setFromPoints(points));
-  }
-
-  return geometries;
-}
-
 function Globe() {
   const ref = useRef<THREE.Group>(null);
 
@@ -70,34 +43,27 @@ function Globe() {
     }
   });
 
-  const gridLines = useMemo(() => generateGlobeLines(GLOBE_RADIUS), []);
+  
 
   return (
     <group ref={ref}>
-      {/* Solid sphere */}
+      {/* Earth sphere with texture */}
       <mesh>
-        <sphereGeometry args={[GLOBE_RADIUS - 0.01, 64, 64]} />
+        <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
         <meshStandardMaterial
-          color="hsl(170, 25%, 8%)"
-          transparent
-          opacity={0.85}
+          map={useLoader(THREE.TextureLoader, "/earth-texture.jpg")}
+          roughness={0.9}
+          metalness={0.05}
         />
       </mesh>
-
-      {/* Grid lines */}
-      {gridLines.map((geo, i) => {
-        const mat = new THREE.LineBasicMaterial({ color: "hsl(168, 40%, 28%)", transparent: true, opacity: 0.3 });
-        const lineObj = new THREE.Line(geo, mat);
-        return <primitive key={i} object={lineObj} />;
-      })}
 
       {/* Atmosphere glow */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS + 0.08, 64, 64]} />
         <meshStandardMaterial
-          color="hsl(168, 60%, 45%)"
+          color="hsl(200, 60%, 50%)"
           transparent
-          opacity={0.06}
+          opacity={0.08}
           side={THREE.BackSide}
         />
       </mesh>
@@ -203,9 +169,9 @@ function Scene({
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <pointLight position={[10, 10, 10]} intensity={0.8} />
-      <pointLight position={[-10, -5, -10]} intensity={0.3} color="hsl(168, 60%, 45%)" />
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[5, 3, 5]} intensity={1.5} />
+      <pointLight position={[-10, -5, -10]} intensity={0.4} color="hsl(200, 60%, 60%)" />
       <Globe />
       {LOCATION_POINTS.map((loc) => (
         <LocationMarker
