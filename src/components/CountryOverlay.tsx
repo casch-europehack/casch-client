@@ -31,8 +31,8 @@ const LOCATIONS: LocationEntry[] = [
 export { LOCATIONS };
 
 export function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
-  const phi = (100 - lat) * (Math.PI / 180);
-  const theta = (lng + 178) * (Math.PI / 180);
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
   return new THREE.Vector3(
     -radius * Math.sin(phi) * Math.cos(theta),
     radius * Math.cos(phi),
@@ -103,15 +103,15 @@ function getPolygons(feature: GeoFeature): { ring: number[][]; holes: number[][]
 
 // Mock carbon intensity data (gCO2/kWh)
 const CARBON_INTENSITY: Record<string, number> = {
-  "IE": 296,
-  "PL": 635,
-  "DE": 338,
-  "FR": 56,
-  "SE": 41,
+  IE: 296,
+  PL: 635,
+  DE: 338,
+  FR: 56,
+  SE: 41,
   "US-CAL-CISO": 210,
   "US-NY-NYIS": 180,
   "US-TEX-ERCO": 396,
-  "GB": 198,
+  GB: 198,
   "NO-NO1": 26,
 };
 
