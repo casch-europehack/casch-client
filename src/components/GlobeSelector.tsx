@@ -26,11 +26,11 @@ const GLOBE_RADIUS = 2;
 
 function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lng + 70) * (Math.PI / 180);
+  const theta = (lng + 20) * (Math.PI / 180);
   return new THREE.Vector3(
     radius * Math.sin(phi) * Math.sin(theta),
     radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.cos(theta)
+    radius * Math.sin(phi) * Math.cos(theta),
   );
 }
 
@@ -50,12 +50,7 @@ function Globe() {
       {/* Atmosphere glow */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS + 0.08, 64, 64]} />
-        <meshStandardMaterial
-          color="hsl(200, 60%, 50%)"
-          transparent
-          opacity={0.08}
-          side={THREE.BackSide}
-        />
+        <meshStandardMaterial color="hsl(200, 60%, 50%)" transparent opacity={0.08} side={THREE.BackSide} />
       </mesh>
     </group>
   );
@@ -70,10 +65,7 @@ interface MarkerProps {
 }
 
 function LocationMarker({ location, isSelected, isHovered, onSelect, onHover }: MarkerProps) {
-  const position = useMemo(
-    () => latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.02),
-    [location]
-  );
+  const position = useMemo(() => latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.02), [location]);
 
   const pulseRef = useRef<THREE.Mesh>(null);
   useFrame((_, delta) => {
@@ -92,11 +84,7 @@ function LocationMarker({ location, isSelected, isHovered, onSelect, onHover }: 
       {isSelected && (
         <mesh ref={pulseRef}>
           <sphereGeometry args={[0.12, 16, 16]} />
-          <meshStandardMaterial
-            color="hsl(168, 60%, 45%)"
-            transparent
-            opacity={0.25}
-          />
+          <meshStandardMaterial color="hsl(168, 60%, 45%)" transparent opacity={0.25} />
         </mesh>
       )}
       {/* Marker dot */}
@@ -125,11 +113,7 @@ function LocationMarker({ location, isSelected, isHovered, onSelect, onHover }: 
       </mesh>
       {/* Label */}
       {(isHovered || isSelected) && (
-        <Html
-          position={[0, 0.18, 0]}
-          center
-          style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
-        >
+        <Html position={[0, 0.18, 0]} center style={{ pointerEvents: "none", whiteSpace: "nowrap" }}>
           <div
             className="px-2.5 py-1 rounded-md text-xs font-display font-medium shadow-elevated"
             style={{
