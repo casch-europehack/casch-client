@@ -10,32 +10,34 @@ interface EnergyChartProps {
 
 export function EnergyChart({ data }: EnergyChartProps) {
   const chartData = useMemo(() => {
-    let cumulativeTime = 0;
-    return data.step_energy_J.map((energy, i) => {
-      cumulativeTime += data.step_time_s[i];
-      return {
-        step: i + 1,
-        time_s: parseFloat(cumulativeTime.toFixed(2)),
-        energy_J: parseFloat(energy.toFixed(4)),
-      };
-    });
+    return data.power_timeseries.time_s.map((t, i) => ({
+      time_s: t,
+      power_W: data.power_timeseries.power_W[i],
+    }));
   }, [data]);
+
+  const avgPower = useMemo(() => {
+    const powers = data.power_timeseries.power_W;
+    return powers.reduce((a, b) => a + b, 0) / powers.length;
+  }, [data]);
+
+  const peakPower = useMemo(() => Math.max(...data.power_timeseries.power_W), [data]);
 
   return (
     <div className="bg-card border border-border rounded-lg p-6 shadow-card animate-slide-up">
       <div className="mb-4">
         <h3 className="text-lg font-display font-semibold text-foreground">
-          Energy Consumption
+          Power Consumption
         </h3>
         <p className="text-sm text-muted-foreground">
-          Estimated energy per step
+          Instantaneous power output over time
         </p>
       </div>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
             <defs>
-              <linearGradient id="energyGradient" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="powerGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="hsl(var(--chart-energy))" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="hsl(var(--chart-energy))" stopOpacity={0} />
               </linearGradient>
@@ -48,7 +50,7 @@ export function EnergyChart({ data }: EnergyChartProps) {
             />
             <YAxis
               tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-              label={{ value: "Energy (J)", angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "hsl(var(--muted-foreground))" } }}
+              label={{ value: "Power (W)", angle: -90, position: "insideLeft", style: { fontSize: 12, fill: "hsl(var(--muted-foreground))" } }}
             />
             <Tooltip
               contentStyle={{
@@ -57,12 +59,14 @@ export function EnergyChart({ data }: EnergyChartProps) {
                 borderRadius: "var(--radius)",
                 fontSize: 12,
               }}
+              formatter={(value: number) => [`${value.toFixed(2)} W`, "Power"]}
+              labelFormatter={(label: number) => `${label.toFixed(1)}s`}
             />
             <Area
-              type="monotone"
-              dataKey="energy_J"
+              type="stepAfter"
+              dataKey="power_W"
               stroke="hsl(var(--chart-energy))"
-              fill="url(#energyGradient)"
+              fill="url(#powerGradient)"
               strokeWidth={2}
             />
           </AreaChart>
@@ -71,9 +75,9 @@ export function EnergyChart({ data }: EnergyChartProps) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-4 border-t border-border">
         <Stat label="Total Energy" value={`${data.estimated_total_energy_Wh.toFixed(2)} Wh`} />
-        <Stat label="Avg/Step" value={`${data.mean_energy_per_step_J.toFixed(4)} J`} />
+        <Stat label="Avg Power" value={`${avgPower.toFixed(2)} W`} />
+        <Stat label="Peak Power" value={`${peakPower.toFixed(2)} W`} />
         <Stat label="Est. Duration" value={formatTime(data.estimated_total_time_s)} />
-        <Stat label="Total Steps" value={data.total_steps.toLocaleString()} />
       </div>
     </div>
   );

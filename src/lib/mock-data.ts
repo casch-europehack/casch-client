@@ -63,6 +63,24 @@ export function generateMockProfiling(): ProfilingResult {
   const estimated_total_energy_Wh = step_energy_J.reduce((a, b) => a + b, 0) / 3600;
   const estimated_total_time_s = step_time_s.reduce((a, b) => a + b, 0);
 
+  // Compute power = energy / time per step
+  const step_power = step_energy_J.map((e, i) => e / step_time_s[i]);
+  const cum_times: number[] = [];
+  step_time_s.reduce((acc, t, i) => { cum_times[i] = acc + t; return cum_times[i]; }, 0);
+
+  // Generate timeseries at 1s resolution
+  const totalTime = cum_times[cum_times.length - 1];
+  const ts_time: number[] = [];
+  const ts_power: number[] = [];
+  for (let t = 0; t < totalTime; t += 1.0) {
+    ts_time.push(parseFloat(t.toFixed(2)));
+    const idx = cum_times.findIndex(ct => ct > t);
+    ts_power.push(idx >= 0 ? parseFloat(step_power[idx].toFixed(4)) : 0);
+  }
+
+  // Generate intervals
+  const start_times = [0, ...cum_times.slice(0, -1)];
+
   return {
     profiled_epochs,
     steps_per_epoch,
@@ -78,6 +96,12 @@ export function generateMockProfiling(): ProfilingResult {
     profiled_step_time_s,
     step_energy_J,
     step_time_s,
+    power_timeseries: { time_s: ts_time, power_W: ts_power },
+    power_intervals: {
+      start_time_s: start_times.map(t => parseFloat(t.toFixed(2))),
+      end_time_s: cum_times.map(t => parseFloat(t.toFixed(2))),
+      power_W: step_power.map(p => parseFloat(p.toFixed(4))),
+    },
     file_hash: `mock_${Date.now()}`,
   };
 }
