@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback } from "react";
+import { useRef, useState, useMemo } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -26,27 +26,17 @@ const GLOBE_RADIUS = 2;
 
 function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lng + 180) * (Math.PI / 180);
+  const theta = (lng) * (Math.PI / 180);
   return new THREE.Vector3(
-    -(radius * Math.sin(phi) * Math.cos(theta)),
+    radius * Math.sin(phi) * Math.sin(theta),
     radius * Math.cos(phi),
-    radius * Math.sin(phi) * Math.sin(theta)
+    radius * Math.sin(phi) * Math.cos(theta)
   );
 }
 
 function Globe() {
-  const ref = useRef<THREE.Group>(null);
-
-  useFrame((_, delta) => {
-    if (ref.current) {
-      ref.current.rotation.y += delta * 0.05;
-    }
-  });
-
-  
-
   return (
-    <group ref={ref}>
+    <group>
       {/* Earth sphere with texture */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
