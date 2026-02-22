@@ -1,34 +1,22 @@
-import { useRef } from "react";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Canvas, useLoader } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { CountryOverlays, LOCATIONS } from "./CountryOverlay";
 
 const GLOBE_RADIUS = 2;
 
-function AnimatedGlobe() {
-  const groupRef = useRef<THREE.Group>(null);
-  const texture = useLoader(THREE.TextureLoader, "/earth-texture.jpg");
-
-  // Slowly rotate the globe
-  useFrame(({ clock }) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = clock.getElapsedTime() * 0.03;
-    }
-  });
+function StylizedGlobe() {
+  const texture = useLoader(THREE.TextureLoader, "/earth-texture-stylized.jpg");
 
   return (
-    <group ref={groupRef}>
-      {/* Bright Earth sphere */}
+    <group>
+      {/* Stylized Earth sphere */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
         <meshStandardMaterial
           map={texture}
-          roughness={0.5}
-          metalness={0.05}
-          emissiveMap={texture}
-          emissive="hsl(200, 50%, 100%)"
-          emissiveIntensity={0.15}
+          roughness={0.6}
+          metalness={0.0}
         />
       </mesh>
 
@@ -68,11 +56,11 @@ function Scene({
 }) {
   return (
     <>
-      <ambientLight intensity={1.4} />
-      <directionalLight position={[5, 3, 5]} intensity={1.8} />
-      <pointLight position={[-10, -5, -10]} intensity={0.5} color="hsl(200, 60%, 60%)" />
+      <ambientLight intensity={1.6} />
+      <directionalLight position={[5, 3, 5]} intensity={1.5} />
+      <pointLight position={[-10, -5, -10]} intensity={0.4} color="hsl(200, 60%, 60%)" />
       <pointLight position={[3, 8, -3]} intensity={0.3} color="hsl(168, 50%, 50%)" />
-      <AnimatedGlobe />
+      <StylizedGlobe />
       <CountryOverlays value={value} onChange={onChange} disabled={disabled} />
       <OrbitControls
         enableZoom={false}
