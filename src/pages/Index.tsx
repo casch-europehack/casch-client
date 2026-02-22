@@ -43,7 +43,6 @@ const Index = () => {
       const result = await analyzeFile(selectedFile);
       setProfilingResult(result);
 
-      // Immediately fetch CO2 data for default location
       setIsLoadingCO2(true);
       try {
         const co2 = await getCO2Emissions(result.file_hash, "IE");
@@ -62,6 +61,8 @@ const Index = () => {
 
   const handleLocationChange = useCallback(async (newLocation: string) => {
     setLocation(newLocation);
+    setAdvancedOpen(false);
+    setAggregatedResult(null);
     if (!profilingResult) return;
     setIsLoadingCO2(true);
     try {
@@ -115,7 +116,7 @@ const Index = () => {
           </div>
           <div>
             <h1 className="text-lg font-display font-bold text-foreground leading-tight">
-              CarbonLens
+              Casch
             </h1>
             <p className="text-[11px] text-muted-foreground leading-tight">
               ML training carbon profiler
