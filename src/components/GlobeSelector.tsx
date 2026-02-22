@@ -1,8 +1,9 @@
 import { useRef, useCallback, useState, useEffect } from "react";
+import { Crosshair } from "lucide-react";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import { CountryOverlays, LOCATIONS, latLngToVector3 } from "./CountryOverlay";
+import { CountryOverlays, LOCATIONS, latLngToVector3, CARBON_INTENSITY, intensityToColor } from "./CountryOverlay";
 import { LocationList } from "./LocationList";
 
 const GLOBE_RADIUS = 2;
@@ -144,17 +145,25 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
           >
             <Scene value={value} onChange={handleSelect} disabled={disabled} flyToTrigger={flyToTrigger} />
           </Canvas>
-          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <span className="font-display font-medium text-foreground">{selectedLabel}</span>
-            </div>
-            {disabled && (
-              <div className="px-3 py-1.5 rounded-full bg-muted/80 backdrop-blur-sm text-xs text-muted-foreground">
-                Loading…
-              </div>
-            )}
+          {/* Country name - upper left */}
+          <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
+            <span className="w-2 h-2 rounded-full" style={{ background: intensityToColor(CARBON_INTENSITY[value] || 300).color }} />
+            <span className="font-display font-medium text-foreground">{selectedLabel}</span>
           </div>
+          {/* Recenter button - upper right */}
+          <button
+            onClick={() => handleSelect(value)}
+            className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-xs font-display text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+            title="Recenter on selected location"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            Recenter
+          </button>
+          {disabled && (
+            <div className="absolute bottom-4 left-4 px-3 py-1.5 rounded-full bg-muted/80 backdrop-blur-sm text-xs text-muted-foreground">
+              Loading…
+            </div>
+          )}
         </div>
       </div>
     </div>
