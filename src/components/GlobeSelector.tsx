@@ -85,8 +85,8 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
   return (
     <div className="bg-card border border-border rounded-lg shadow-card overflow-hidden">
       <div className="relative h-[480px] w-full">
-        <Canvas
-          camera={{ position: [0, 1.5, 5.5], fov: 40 }}
+      <Canvas
+          camera={{ position: [0, 1.5, 6.2], fov: 38 }}
           style={{ background: "transparent" }}
           gl={{ antialias: true, alpha: true }}
         >

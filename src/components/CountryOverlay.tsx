@@ -101,23 +101,54 @@ function getPolygons(feature: GeoFeature): { ring: number[][]; holes: number[][]
   return [];
 }
 
+// Mock carbon intensity data (gCO2/kWh)
+const CARBON_INTENSITY: Record<string, number> = {
+  "IE": 296,
+  "PL": 635,
+  "DE": 338,
+  "FR": 56,
+  "SE": 41,
+  "US-CAL-CISO": 210,
+  "US-NY-NYIS": 180,
+  "US-TEX-ERCO": 396,
+  "GB": 198,
+  "NO-NO1": 26,
+};
+
+function intensityToColor(intensity: number): { color: string; emissive: string; label: string } {
+  // 0-100: green, 100-300: yellow, 300+: red
+  if (intensity <= 100) {
+    const hue = 120;
+    return { color: `hsl(${hue}, 65%, 45%)`, emissive: `hsl(${hue}, 65%, 25%)`, label: "Low" };
+  } else if (intensity <= 300) {
+    const t = (intensity - 100) / 200;
+    const hue = 120 - t * 60; // 120 -> 60
+    return { color: `hsl(${hue}, 70%, 45%)`, emissive: `hsl(${hue}, 70%, 25%)`, label: "Medium" };
+  } else {
+    const t = Math.min((intensity - 300) / 400, 1);
+    const hue = 60 - t * 60; // 60 -> 0
+    return { color: `hsl(${hue}, 80%, 45%)`, emissive: `hsl(${hue}, 80%, 25%)`, label: "High" };
+  }
+}
+
 function CountryShape({
   geometries,
   isSelected,
   isHovered,
+  intensityColor,
   onClick,
   onHover,
 }: {
   geometries: THREE.BufferGeometry[];
   isSelected: boolean;
   isHovered: boolean;
+  intensityColor: { color: string; emissive: string; label: string };
   onClick: () => void;
   onHover: (h: boolean) => void;
 }) {
-  const color = isSelected ? "hsl(168, 60%, 50%)" : isHovered ? "hsl(38, 80%, 55%)" : "hsl(168, 55%, 30%)";
-
-  const opacity = isSelected ? 0.7 : isHovered ? 0.6 : 0.3;
-  const emissive = isSelected ? "hsl(168, 60%, 30%)" : isHovered ? "hsl(38, 70%, 30%)" : "hsl(168, 55%, 10%)";
+  const color = isSelected || !isHovered ? intensityColor.color : "hsl(38, 80%, 55%)";
+  const opacity = isSelected ? 0.7 : isHovered ? 0.6 : 0.4;
+  const emissive = isSelected || !isHovered ? intensityColor.emissive : "hsl(38, 70%, 30%)";
 
   return (
     <group>
@@ -218,12 +249,16 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
         const isSelected = value === location.value;
         const isHovered = hoveredLocation === location.value;
 
+        const intensity = CARBON_INTENSITY[location.value] || 300;
+        const intColor = intensityToColor(intensity);
+
         return (
           <group key={location.value}>
             <CountryShape
               geometries={geometries}
               isSelected={isSelected}
               isHovered={isHovered}
+              intensityColor={intColor}
               onClick={() => {
                 if (!disabled) onChange(location.value);
               }}
@@ -232,21 +267,33 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
             {(isHovered || isSelected) && (
               <Html
                 position={
-                  latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.15).toArray() as [number, number, number]
+                  latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.25).toArray() as [number, number, number]
                 }
                 center
-                style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
+                style={{ pointerEvents: "none", whiteSpace: "nowrap", transform: "translateY(-100%)" }}
               >
                 <div
-                  className="px-2.5 py-1 rounded-md text-xs font-display font-medium shadow-elevated"
+                  className="px-2.5 py-1.5 rounded-md text-xs font-display font-medium shadow-elevated flex flex-col items-center gap-0.5"
                   style={{
                     background: "hsl(170, 20%, 10%)",
                     color: "hsl(160, 10%, 93%)",
                     border: "1px solid hsl(168, 40%, 28%)",
                   }}
                 >
-                  {location.label}
+                  <span>{location.label}</span>
+                  <span className="flex items-center gap-1 text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: intColor.color }} />
+                    {intensity} gCO₂/kWh · {intColor.label}
+                  </span>
                 </div>
+                <div
+                  className="mx-auto w-0 h-0"
+                  style={{
+                    borderLeft: "5px solid transparent",
+                    borderRight: "5px solid transparent",
+                    borderTop: "5px solid hsl(170, 20%, 10%)",
+                  }}
+                />
               </Html>
             )}
           </group>
