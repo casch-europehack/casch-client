@@ -6,40 +6,26 @@ import { CountryOverlays, LOCATIONS } from "./CountryOverlay";
 const GLOBE_RADIUS = 2;
 
 function StylizedGlobe() {
-  const texture = useLoader(THREE.TextureLoader, "/earth-texture.jpg");
+  const texture = useLoader(THREE.TextureLoader, "/earth-texture.png");
 
   return (
     <group>
       {/* Stylized Earth sphere */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
-        <meshStandardMaterial
-          map={texture}
-          roughness={0.6}
-          metalness={0.0}
-        />
+        <meshStandardMaterial map={texture} roughness={0.6} metalness={0.0} />
       </mesh>
 
       {/* Atmospheric glow - inner */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS + 0.06, 64, 64]} />
-        <meshStandardMaterial
-          color="hsl(200, 70%, 60%)"
-          transparent
-          opacity={0.07}
-          side={THREE.BackSide}
-        />
+        <meshStandardMaterial color="hsl(200, 70%, 60%)" transparent opacity={0.07} side={THREE.BackSide} />
       </mesh>
 
       {/* Atmospheric glow - outer */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS + 0.18, 64, 64]} />
-        <meshStandardMaterial
-          color="hsl(200, 80%, 65%)"
-          transparent
-          opacity={0.04}
-          side={THREE.BackSide}
-        />
+        <meshStandardMaterial color="hsl(200, 80%, 65%)" transparent opacity={0.04} side={THREE.BackSide} />
       </mesh>
     </group>
   );
@@ -85,7 +71,7 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
   return (
     <div className="bg-card border border-border rounded-lg shadow-card overflow-hidden">
       <div className="relative h-[480px] w-full">
-      <Canvas
+        <Canvas
           camera={{ position: [0, 1.5, 6.2], fov: 38 }}
           style={{ background: "transparent" }}
           gl={{ antialias: true, alpha: true }}
