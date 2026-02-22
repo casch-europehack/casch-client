@@ -32,7 +32,7 @@ export { LOCATIONS };
 
 export function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lng + 160) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
   return new THREE.Vector3(
     -radius * Math.sin(phi) * Math.cos(theta),
     radius * Math.cos(phi),
@@ -40,11 +40,7 @@ export function latLngToVector3(lat: number, lng: number, radius: number): THREE
   );
 }
 
-function polygonToGeometry(
-  ring: number[][],
-  holes: number[][][],
-  radius: number,
-): THREE.BufferGeometry | null {
+function polygonToGeometry(ring: number[][], holes: number[][][], radius: number): THREE.BufferGeometry | null {
   if (!ring || ring.length < 3) return null;
 
   const flatCoords: number[] = [];
@@ -118,18 +114,10 @@ function CountryShape({
   onClick: () => void;
   onHover: (h: boolean) => void;
 }) {
-  const color = isSelected
-    ? "hsl(168, 60%, 50%)"
-    : isHovered
-      ? "hsl(38, 80%, 55%)"
-      : "hsl(168, 55%, 30%)";
+  const color = isSelected ? "hsl(168, 60%, 50%)" : isHovered ? "hsl(38, 80%, 55%)" : "hsl(168, 55%, 30%)";
 
   const opacity = isSelected ? 0.7 : isHovered ? 0.6 : 0.3;
-  const emissive = isSelected
-    ? "hsl(168, 60%, 30%)"
-    : isHovered
-      ? "hsl(38, 70%, 30%)"
-      : "hsl(168, 55%, 10%)";
+  const emissive = isSelected ? "hsl(168, 60%, 30%)" : isHovered ? "hsl(38, 70%, 30%)" : "hsl(168, 55%, 10%)";
 
   return (
     <group>
@@ -243,11 +231,9 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
             />
             {(isHovered || isSelected) && (
               <Html
-                position={latLngToVector3(
-                  location.lat,
-                  location.lng,
-                  GLOBE_RADIUS + 0.15,
-                ).toArray() as [number, number, number]}
+                position={
+                  latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.15).toArray() as [number, number, number]
+                }
                 center
                 style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
               >
