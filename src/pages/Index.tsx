@@ -5,6 +5,7 @@ import { AnalyzingSpinner } from "@/components/AnalyzingSpinner";
 import { EnergyChart } from "@/components/EnergyChart";
 import { CO2Chart } from "@/components/CO2Chart";
 import { AggregatedCO2Chart } from "@/components/AggregatedCO2Chart";
+import { GlobeSelector } from "@/components/GlobeSelector";
 import { LocationSelector } from "@/components/LocationSelector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -182,18 +183,18 @@ const Index = () => {
         {/* Results */}
         {profilingResult && !isAnalyzing && (
           <div className="space-y-6 animate-slide-up">
-            {/* Top bar with file info + location */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card border border-border rounded-lg p-4 shadow-soft">
-              <div className="flex items-center gap-2 text-sm">
-                <Zap className="w-4 h-4 text-primary" />
-                <span className="font-display font-semibold text-foreground">
-                  {profilingResult.total_epochs} epochs · {profilingResult.total_steps.toLocaleString()} steps
-                </span>
-                <span className="text-muted-foreground">
-                  (profiled {profilingResult.profiled_epochs} epochs)
-                </span>
-              </div>
-              <LocationSelector value={location} onChange={handleLocationChange} disabled={isLoadingCO2} />
+            {/* Globe location selector */}
+            <GlobeSelector value={location} onChange={handleLocationChange} disabled={isLoadingCO2} />
+
+            {/* Top bar with file info */}
+            <div className="flex items-center gap-2 text-sm bg-card border border-border rounded-lg p-4 shadow-soft">
+              <Zap className="w-4 h-4 text-primary" />
+              <span className="font-display font-semibold text-foreground">
+                {profilingResult.total_epochs} epochs · {profilingResult.total_steps.toLocaleString()} steps
+              </span>
+              <span className="text-muted-foreground">
+                (profiled {profilingResult.profiled_epochs} epochs)
+              </span>
             </div>
 
             {/* Energy chart */}
