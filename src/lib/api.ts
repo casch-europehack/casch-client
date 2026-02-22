@@ -1,4 +1,4 @@
-import { API_BASE_URL, ProfilingResult, ProfilingResponse, CO2Result, CO2Response, AggregatedCO2Result, CarbonIntensityMap } from "./types";
+import { API_BASE_URL, ProfilingResult, ProfilingResponse, CO2Result, CO2Response, AggregatedCO2Result, CarbonIntensityMap, ScheduleResult } from "./types";
 import { generateMockProfiling, generateMockCO2, generateMockAggregatedCO2 } from "./mock-data";
 
 // Set to true to use mock data instead of real API calls
@@ -149,7 +149,7 @@ export async function scheduleJob(
   file: File,
   location: string,
   policyName: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; result?: ScheduleResult }> {
   if (USE_MOCK) {
     await delay(600);
     return { success: true, message: `Job scheduled with "${policyName}" policy in ${location}. Estimated start within 2 hours.` };
@@ -170,5 +170,10 @@ export async function scheduleJob(
     throw new Error(`Scheduling failed: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return {
+    success: data.success ?? true,
+    message: data.message ?? "Job scheduled successfully",
+    result: data.result as ScheduleResult | undefined,
+  };
 }

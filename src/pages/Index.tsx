@@ -1,14 +1,15 @@
 import { useState, useCallback } from "react";
-import { Leaf, Zap, ChevronDown, Play, AlertCircle } from "lucide-react";
+import { Leaf, Zap, Play, AlertCircle } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
 import { AnalyzingSpinner } from "@/components/AnalyzingSpinner";
 import { EnergyChart } from "@/components/EnergyChart";
 import { CO2Chart } from "@/components/CO2Chart";
 import { AggregatedCO2Chart } from "@/components/AggregatedCO2Chart";
+import { ScheduledJobChart } from "@/components/ScheduledJobChart";
 import { GlobeSelector } from "@/components/GlobeSelector";
 import { Button } from "@/components/ui/button";
 import { analyzeFile, getCO2Emissions, getAggregatedCO2, scheduleJob } from "@/lib/api";
-import { ProfilingResult, CO2Result, AggregatedCO2Result } from "@/lib/types";
+import { ProfilingResult, CO2Result, AggregatedCO2Result, ScheduleResult } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
@@ -22,13 +23,13 @@ const Index = () => {
   const [isLoadingCO2, setIsLoadingCO2] = useState(false);
   const [co2Error, setCo2Error] = useState(false);
 
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [aggregatedResult, setAggregatedResult] = useState<AggregatedCO2Result | null>(null);
   const [isLoadingAggregated, setIsLoadingAggregated] = useState(false);
   const [aggregateError, setAggregateError] = useState(false);
 
   const [selectedPolicy, setSelectedPolicy] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleResult, setScheduleResult] = useState<ScheduleResult | null>(null);
 
   const fetchAggregate = useCallback(async (fileHash: string, loc: string, estimatedTimeS: number) => {
     setIsLoadingAggregated(true);
@@ -38,6 +39,10 @@ const Index = () => {
       const minTime = estimatedTimeS / 3600;
       const agg = await getAggregatedCO2(fileHash, loc, minTime);
       setAggregatedResult(agg);
+      // Default to baseline policy so the schedule button is enabled
+      if (agg.policy_ids && agg.policy_ids.length > 0) {
+        setSelectedPolicy(agg.policy_ids[0]);
+      }
     } catch (err) {
       console.error("Aggregate API failed:", err);
       setAggregatedResult(null);
@@ -53,7 +58,7 @@ const Index = () => {
     setProfilingResult(null);
     setCo2Result(null);
     setAggregatedResult(null);
-    setAdvancedOpen(false);
+    setScheduleResult(null);
     setCo2Error(false);
     setAggregateError(false);
     setSelectedPolicy("");
@@ -73,6 +78,9 @@ const Index = () => {
       } finally {
         setIsLoadingCO2(false);
       }
+
+      // Always fetch trade-off data
+      await fetchAggregate(result.file_hash, "IE", result.estimated_total_time_s);
     } catch (err) {
       toast({
         title: "Analysis failed",
@@ -82,7 +90,7 @@ const Index = () => {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [selectedFile, toast]);
+  }, [selectedFile, toast, fetchAggregate]);
 
   const handleLocationChange = useCallback(async (newLocation: string) => {
     setLocation(newLocation);
@@ -101,28 +109,21 @@ const Index = () => {
       setIsLoadingCO2(false);
     }
 
-    if (advancedOpen) {
-      await fetchAggregate(profilingResult.file_hash, newLocation, profilingResult.estimated_total_time_s);
-    }
-  }, [profilingResult, advancedOpen, fetchAggregate]);
-
-  const handleAdvancedToggle = useCallback(async () => {
-    const willOpen = !advancedOpen;
-    setAdvancedOpen(willOpen);
-
-    if (willOpen && profilingResult) {
-      await fetchAggregate(profilingResult.file_hash, location, profilingResult.estimated_total_time_s);
-    }
-  }, [advancedOpen, profilingResult, location, fetchAggregate]);
+    await fetchAggregate(profilingResult.file_hash, newLocation, profilingResult.estimated_total_time_s);
+  }, [profilingResult, fetchAggregate]);
 
   const handleSchedule = useCallback(async () => {
     if (!profilingResult || !selectedFile) return;
-    if (advancedOpen && aggregatedResult && !selectedPolicy) return;
-    const policyToUse = (advancedOpen && selectedPolicy) ? selectedPolicy : "baseline";
+    if (aggregatedResult && !selectedPolicy) return;
+    const policyToUse = selectedPolicy || "baseline";
     setIsScheduling(true);
+    setScheduleResult(null);
     try {
       const result = await scheduleJob(selectedFile, location, policyToUse);
       toast({ title: "Job Scheduled!", description: result.message });
+      if (result.result) {
+        setScheduleResult(result.result);
+      }
     } catch (err) {
       toast({
         title: "Scheduling failed",
@@ -132,7 +133,7 @@ const Index = () => {
     } finally {
       setIsScheduling(false);
     }
-  }, [profilingResult, selectedFile, selectedPolicy, location, aggregatedResult, toast, advancedOpen]);
+  }, [profilingResult, selectedFile, selectedPolicy, location, aggregatedResult, toast]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -234,20 +235,8 @@ const Index = () => {
                 </div>
               )}
 
-              {/* Expand / Collapse trade-off section */}
-              <div className="mb-4">
-                <button
-                  onClick={handleAdvancedToggle}
-                  className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
-                >
-                  {advancedOpen ? "Hide trade-off analysis" : "Show duration vs CO₂ trade-off"}
-                  <ChevronDown className={`w-4 h-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-                </button>
-              </div>
-
               {/* Trade-off section */}
-              {advancedOpen && (
-                <div className="space-y-6 mb-6 border-t border-border pt-4">
+              <div className="space-y-6 mb-6 border-t border-border pt-4">
                   {isLoadingAggregated ? (
                     <div className="flex items-center justify-center py-12 h-[300px]">
                       <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -265,22 +254,24 @@ const Index = () => {
                       onSelectPolicy={setSelectedPolicy}
                     />
                   ) : null}
-                </div>
-              )}
+              </div>
 
               <Button
                 onClick={handleSchedule}
-                disabled={isScheduling || (advancedOpen && isLoadingAggregated) || (advancedOpen && aggregatedResult && !selectedPolicy)}
+                disabled={isScheduling || isLoadingAggregated || (aggregatedResult && !selectedPolicy)}
                 className="w-full sm:w-auto gradient-eco text-primary-foreground hover:opacity-90"
               >
                 {isScheduling
                   ? "Scheduling…"
                   : selectedPolicy
-                    ? `Schedule with ${selectedPolicy}`
+                    ? `Schedule with ${selectedPolicy.replace(/^step_(\d+)$/, 'Step: $1')}`
                     : "Schedule Job"
                 }
               </Button>
             </div>
+
+            {/* Scheduled job energy & throttle chart */}
+            {scheduleResult && <ScheduledJobChart data={scheduleResult} />}
 
             {/* Back button */}
             <div className="text-center pt-4">
@@ -290,7 +281,7 @@ const Index = () => {
                   setProfilingResult(null);
                   setCo2Result(null);
                   setAggregatedResult(null);
-                  setAdvancedOpen(false);
+                  setScheduleResult(null);
                   setSelectedPolicy("");
                   setSelectedFile(null);
                 }}

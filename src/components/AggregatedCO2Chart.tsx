@@ -4,11 +4,25 @@ import {
   ReferenceDot,
 } from "recharts";
 import { AggregatedCO2Result } from "@/lib/types";
-import { TrendingDown, Clock, Leaf } from "lucide-react";
+import { TrendingDown, Clock, Leaf, HelpCircle } from "lucide-react";
+import {
+  Tooltip as UITooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+
+/** Convert "step_100" → "Step: 100" */
+function formatPolicyId(id: string): string {
+  const m = id.match(/^step_(\d+)$/);
+  return m ? `Step: ${m[1]}` : id;
+}
 
 interface ChartPoint {
   index: number;
   time_h: number;
+  additional_s: number;
+  additional_display: number;
   co2_g: number;
   policy_id: string;
   duration_s: number;
@@ -20,16 +34,47 @@ interface AggregatedCO2ChartProps {
   onSelectPolicy?: (policyId: string) => void;
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds.toFixed(0)}s`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(1)} min`;
+  return `${(seconds / 3600).toFixed(2)}h`;
+}
+
 export function AggregatedCO2Chart({ data, selectedPolicy, onSelectPolicy }: AggregatedCO2ChartProps) {
+  const baselineDuration = data.durations[0] ?? 0;
+
+  // Use minutes when the additional time range is less than 2 hours
+  const maxAdditional = (data.durations[data.durations.length - 1] ?? 0) - baselineDuration;
+  const useMinutes = maxAdditional < 7200;
+
   const chartData: ChartPoint[] = useMemo(() => {
-    return data.execution_times_h.map((time, i) => ({
-      index: i,
-      time_h: parseFloat(time.toFixed(2)),
-      co2_g: parseFloat(data.total_co2_g[i].toFixed(2)),
-      policy_id: data.policy_ids[i],
-      duration_s: data.durations[i],
-    }));
-  }, [data]);
+    return data.execution_times_h.map((time, i) => {
+      const additionalS = data.durations[i] - baselineDuration;
+      return {
+        index: i,
+        time_h: parseFloat(time.toFixed(2)),
+        additional_s: additionalS,
+        additional_display: useMinutes
+          ? parseFloat((additionalS / 60).toFixed(1))
+          : parseFloat((additionalS / 3600).toFixed(2)),
+        co2_g: parseFloat(data.total_co2_g[i].toFixed(2)),
+        policy_id: data.policy_ids[i],
+        duration_s: data.durations[i],
+      };
+    });
+  }, [data, baselineDuration, useMinutes]);
+
+  // Y-axis domain: start at the midpoint between 0 and the lowest value
+  const [yMin, yMax] = useMemo(() => {
+    const co2Values = chartData.map((p) => p.co2_g);
+    const minVal = Math.min(...co2Values);
+    const maxVal = Math.max(...co2Values);
+    const padding = (maxVal - minVal) * 0.1 || 1;
+    return [
+      parseFloat((minVal / 2).toFixed(2)),
+      parseFloat((maxVal + padding).toFixed(2)),
+    ];
+  }, [chartData]);
 
   const selectedPoint = useMemo(() => {
     if (!selectedPolicy) return null;
@@ -79,10 +124,22 @@ export function AggregatedCO2Chart({ data, selectedPolicy, onSelectPolicy }: Agg
         <div>
           <h3 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
             <TrendingDown className="w-5 h-5 text-primary" />
-            Duration vs CO₂ Trade-off
+            Additional Duration / CO₂ Savings Trade-off
+            <TooltipProvider delayDuration={200}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs text-sm">
+                  Carbon-aware scheduling saves CO₂ at the cost of slightly longer run times.
+                  The x-axis shows the additional time your job will take, while the y-axis
+                  shows the total CO₂ emitted. Select a point to choose your preferred balance.
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
           </h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Click any point to select your preferred trade-off
+            Pick a point to trade a little extra time for lower emissions
           </p>
         </div>
         {savingsRange && (
@@ -106,16 +163,19 @@ export function AggregatedCO2Chart({ data, selectedPolicy, onSelectPolicy }: Agg
           >
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
-              dataKey="time_h"
+              dataKey="additional_display"
+              type="number"
+              domain={['dataMin', 'dataMax']}
               tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               label={{
-                value: "Execution Time (h)",
+                value: useMinutes ? "Additional Time (min)" : "Additional Time (h)",
                 position: "insideBottom",
                 offset: -10,
                 style: { fontSize: 12, fill: "hsl(var(--muted-foreground))" },
               }}
             />
             <YAxis
+              domain={[yMin, yMax]}
               tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
               label={{
                 value: "Total CO₂ (g)",
@@ -133,16 +193,17 @@ export function AggregatedCO2Chart({ data, selectedPolicy, onSelectPolicy }: Agg
                 fontSize: 12,
               }}
               formatter={(value: number) => [`${value.toFixed(2)} g`, "CO₂"]}
-              labelFormatter={(label: number, payload: any[]) => {
+              labelFormatter={(_label: number, payload: any[]) => {
                 const p = payload?.[0]?.payload;
-                const policyLabel = p?.policy_id ? ` · ${p.policy_id}` : "";
-                return `${label}h${policyLabel}`;
+                const policyLabel = p?.policy_id ? ` · ${formatPolicyId(p.policy_id)}` : "";
+                const additional = p ? formatDuration(p.additional_s) : "";
+                return `+${additional}${policyLabel}`;
               }}
             />
 
             {selectedPoint && (
               <ReferenceDot
-                x={selectedPoint.time_h}
+                x={selectedPoint.additional_display}
                 y={selectedPoint.co2_g}
                 r={10}
                 fill="hsl(var(--chart-optimized))"
@@ -172,12 +233,12 @@ export function AggregatedCO2Chart({ data, selectedPolicy, onSelectPolicy }: Agg
               <div className="w-2.5 h-2.5 rounded-full bg-chart-optimized" />
               <span className="text-xs text-muted-foreground">Selected</span>
               <span className="text-sm font-display font-semibold text-foreground">
-                {selectedPoint.policy_id}
+                {formatPolicyId(selectedPoint.policy_id)}
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-sm">
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-display font-medium">{selectedPoint.time_h.toFixed(2)}h</span>
+              <span className="font-display font-medium">+{formatDuration(selectedPoint.additional_s)}</span>
             </div>
             <div className="flex items-center gap-1.5 text-sm">
               <Leaf className="w-3.5 h-3.5 text-primary" />
@@ -196,13 +257,13 @@ export function AggregatedCO2Chart({ data, selectedPolicy, onSelectPolicy }: Agg
             <div>
               <p className="text-xs text-muted-foreground">Fastest (baseline)</p>
               <p className="text-sm font-display font-semibold">
-                {baselinePoint?.time_h.toFixed(2)}h · {baselinePoint?.co2_g.toFixed(2)}g
+                +0 min · {baselinePoint?.co2_g.toFixed(2)}g
               </p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Greenest</p>
               <p className="text-sm font-display font-semibold">
-                {greenestPoint?.time_h.toFixed(2)}h · {greenestPoint?.co2_g.toFixed(2)}g
+                +{greenestPoint ? formatDuration(greenestPoint.additional_s) : ""} · {greenestPoint?.co2_g.toFixed(2)}g
               </p>
             </div>
             <div>

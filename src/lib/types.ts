@@ -73,6 +73,24 @@ export interface AggregatedCO2Result {
   policies: { name: string; time_h: number; co2_g: number }[];
 }
 
+export interface ScheduleResult {
+  profiled_epochs: number;
+  steps_per_epoch: number;
+  total_epochs: number;
+  total_steps: number;
+  mean_energy_per_step_J: number;
+  std_energy_per_step_J: number;
+  mean_time_per_step_s: number;
+  std_time_per_step_s: number;
+  estimated_total_energy_Wh: number;
+  estimated_total_time_s: number;
+  profiled_step_energy_J: number[];
+  profiled_step_time_s: number[];
+  step_energy_J: number[];
+  step_time_s: number[];
+  throttles: number[];
+}
+
 export interface CarbonIntensityMap {
   [zone: string]: number | null;
 }
