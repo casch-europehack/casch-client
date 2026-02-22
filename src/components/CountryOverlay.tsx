@@ -11,26 +11,28 @@ interface LocationEntry {
   label: string;
   lat: number;
   lng: number;
-  isoCode: string;
+  geoId: string;
+  source: "country" | "us-state";
 }
 
 const LOCATIONS: LocationEntry[] = [
-  { value: "IE", label: "Dublin, Ireland", lat: 53.35, lng: -6.26, isoCode: "372" },
-  { value: "PL", label: "Poland", lat: 52.23, lng: 21.01, isoCode: "616" },
-  { value: "DE", label: "Germany", lat: 51.17, lng: 10.45, isoCode: "276" },
-  { value: "FR", label: "France", lat: 46.6, lng: 1.89, isoCode: "250" },
-  { value: "SE", label: "Sweden", lat: 60.13, lng: 18.64, isoCode: "752" },
-  { value: "US-CAL-CISO", label: "California, USA", lat: 36.78, lng: -119.42, isoCode: "840" },
-  { value: "US-NY-NYIS", label: "New York, USA", lat: 40.71, lng: -74.01, isoCode: "840" },
-  { value: "GB", label: "United Kingdom", lat: 55.38, lng: -3.44, isoCode: "826" },
-  { value: "NO-NO1", label: "Norway", lat: 60.47, lng: 8.47, isoCode: "578" },
+  { value: "IE", label: "Dublin, Ireland", lat: 53.35, lng: -6.26, geoId: "372", source: "country" },
+  { value: "PL", label: "Poland", lat: 52.23, lng: 21.01, geoId: "616", source: "country" },
+  { value: "DE", label: "Germany", lat: 51.17, lng: 10.45, geoId: "276", source: "country" },
+  { value: "FR", label: "France", lat: 46.6, lng: 1.89, geoId: "250", source: "country" },
+  { value: "SE", label: "Sweden", lat: 60.13, lng: 18.64, geoId: "752", source: "country" },
+  { value: "US-CAL-CISO", label: "California, USA", lat: 36.78, lng: -119.42, geoId: "06", source: "us-state" },
+  { value: "US-NY-NYIS", label: "New York, USA", lat: 42.16, lng: -74.95, geoId: "36", source: "us-state" },
+  { value: "US-TEX-ERCO", label: "Texas, USA", lat: 31.97, lng: -99.9, geoId: "48", source: "us-state" },
+  { value: "GB", label: "United Kingdom", lat: 55.38, lng: -3.44, geoId: "826", source: "country" },
+  { value: "NO-NO1", label: "Norway", lat: 60.47, lng: 8.47, geoId: "578", source: "country" },
 ];
 
 export { LOCATIONS };
 
 export function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
-  const theta = (lng + 70) * (Math.PI / 180);
+  const theta = (lng + 160) * (Math.PI / 180);
   return new THREE.Vector3(
     -radius * Math.sin(phi) * Math.cos(theta),
     radius * Math.cos(phi),
@@ -172,43 +174,36 @@ interface CountryOverlaysProps {
 }
 
 export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysProps) {
-  const [geoData, setGeoData] = useState<GeoFeature[] | null>(null);
+  const [countryFeatures, setCountryFeatures] = useState<GeoFeature[] | null>(null);
+  const [stateFeatures, setStateFeatures] = useState<GeoFeature[] | null>(null);
   const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/countries-110m.json")
-      .then((r) => r.json())
-      .then((topology) => {
-        const countries = topojson.feature(
-          topology,
-          topology.objects.countries,
-        );
-        setGeoData((countries as any).features as GeoFeature[]);
-      });
+    // Load both datasets in parallel
+    Promise.all([
+      fetch("/countries-110m.json").then((r) => r.json()),
+      fetch("/us-states-10m.json").then((r) => r.json()),
+    ]).then(([countryTopo, stateTopo]) => {
+      const countries = topojson.feature(countryTopo, countryTopo.objects.countries);
+      setCountryFeatures((countries as any).features as GeoFeature[]);
+
+      const states = topojson.feature(stateTopo, stateTopo.objects.states);
+      setStateFeatures((states as any).features as GeoFeature[]);
+    });
   }, []);
 
-  // Group locations by ISO code to avoid duplicate shapes
-  const isoGroups = useMemo(() => {
-    const groups: Record<string, LocationEntry[]> = {};
-    for (const loc of LOCATIONS) {
-      if (!groups[loc.isoCode]) groups[loc.isoCode] = [];
-      groups[loc.isoCode].push(loc);
-    }
-    return groups;
-  }, []);
-
-  // Build geometries per ISO code
+  // Build geometries for each location
   const shapeData = useMemo(() => {
-    if (!geoData) return [];
+    if (!countryFeatures || !stateFeatures) return [];
 
     const result: {
-      isoCode: string;
-      locations: LocationEntry[];
+      location: LocationEntry;
       geometries: THREE.BufferGeometry[];
     }[] = [];
 
-    for (const [isoCode, locations] of Object.entries(isoGroups)) {
-      const feature = geoData.find((f) => f.id === isoCode);
+    for (const loc of LOCATIONS) {
+      const features = loc.source === "country" ? countryFeatures : stateFeatures;
+      const feature = features.find((f) => f.id === loc.geoId);
       if (!feature) continue;
 
       const polygons = getPolygons(feature);
@@ -220,47 +215,37 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
       }
 
       if (geos.length > 0) {
-        result.push({ isoCode, locations, geometries: geos });
+        result.push({ location: loc, geometries: geos });
       }
     }
 
     return result;
-  }, [geoData, isoGroups]);
+  }, [countryFeatures, stateFeatures]);
 
-  if (!geoData) return null;
+  if (!countryFeatures || !stateFeatures) return null;
 
   return (
     <group>
-      {shapeData.map(({ isoCode, locations, geometries }) => {
-        const isSelected = locations.some((l) => l.value === value);
-        const isHovered = locations.some((l) => l.value === hoveredLocation);
-        // Use the first location for label, or the selected one
-        const displayLoc = locations.find((l) => l.value === value) || locations[0];
+      {shapeData.map(({ location, geometries }) => {
+        const isSelected = value === location.value;
+        const isHovered = hoveredLocation === location.value;
 
         return (
-          <group key={isoCode}>
+          <group key={location.value}>
             <CountryShape
               geometries={geometries}
               isSelected={isSelected}
               isHovered={isHovered}
               onClick={() => {
-                if (disabled) return;
-                // If multiple locations share this country, cycle through them
-                if (locations.length === 1) {
-                  onChange(locations[0].value);
-                } else {
-                  const currentIdx = locations.findIndex((l) => l.value === value);
-                  const nextIdx = (currentIdx + 1) % locations.length;
-                  onChange(locations[nextIdx].value);
-                }
+                if (!disabled) onChange(location.value);
               }}
-              onHover={(h) => setHoveredLocation(h ? locations[0].value : null)}
+              onHover={(h) => setHoveredLocation(h ? location.value : null)}
             />
             {(isHovered || isSelected) && (
               <Html
                 position={latLngToVector3(
-                  displayLoc.lat,
-                  displayLoc.lng,
+                  location.lat,
+                  location.lng,
                   GLOBE_RADIUS + 0.15,
                 ).toArray() as [number, number, number]}
                 center
@@ -274,7 +259,7 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
                     border: "1px solid hsl(168, 40%, 28%)",
                   }}
                 >
-                  {displayLoc.label}
+                  {location.label}
                 </div>
               </Html>
             )}

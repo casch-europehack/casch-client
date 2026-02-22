@@ -22,6 +22,7 @@ const CARBON_INTENSITY: Record<string, number> = {
   "SE": 41,
   "US-CAL-CISO": 210,
   "US-NY-NYIS": 180,
+  "US-TEX-ERCO": 396,
   "GB": 198,
   "NO-NO1": 26,
 };
@@ -34,6 +35,7 @@ const LOCATION_NAMES: Record<string, string> = {
   "SE": "Sweden",
   "US-CAL-CISO": "California, USA",
   "US-NY-NYIS": "New York, USA",
+  "US-TEX-ERCO": "Texas, USA",
   "GB": "United Kingdom",
   "NO-NO1": "Norway",
 };
