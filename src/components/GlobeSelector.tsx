@@ -2,7 +2,8 @@ import { useRef, useCallback, useState, useEffect } from "react";
 import { Canvas, useThree, useFrame, useLoader } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import { CountryOverlays, LOCATIONS, latLngToVector3 } from "./CountryOverlay";
+import { Crosshair } from "lucide-react";
+import { CountryOverlays, LOCATIONS, latLngToVector3, CARBON_INTENSITY, intensityToColor } from "./CountryOverlay";
 import { LocationList } from "./LocationList";
 
 const GLOBE_RADIUS = 2;
@@ -13,19 +14,14 @@ function StylizedGlobe() {
 
   return (
     <group>
-      {/* Stylized Earth sphere */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
         <meshStandardMaterial map={texture} roughness={0.6} metalness={0.0} />
       </mesh>
-
-      {/* Atmospheric glow - inner */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS + 0.06, 64, 64]} />
         <meshStandardMaterial color="hsl(200, 70%, 60%)" transparent opacity={0.07} side={THREE.BackSide} />
       </mesh>
-
-      {/* Atmospheric glow - outer */}
       <mesh>
         <sphereGeometry args={[GLOBE_RADIUS + 0.18, 64, 64]} />
         <meshStandardMaterial color="hsl(200, 80%, 65%)" transparent opacity={0.04} side={THREE.BackSide} />
@@ -34,35 +30,33 @@ function StylizedGlobe() {
   );
 }
 
-// Animates camera to face a location on the globe
-function CameraAnimator({ targetLocation }: { targetLocation: string | null }) {
+// Animates camera to face a location, only when triggered
+function CameraFlyTo({ targetValue, triggerCount }: { targetValue: string; triggerCount: number }) {
   const { camera } = useThree();
   const targetPos = useRef<THREE.Vector3 | null>(null);
   const animating = useRef(false);
+  const lastTrigger = useRef(0);
 
   useEffect(() => {
-    if (!targetLocation) return;
-    const loc = LOCATIONS.find((l) => l.value === targetLocation);
+    if (triggerCount === 0 || triggerCount === lastTrigger.current) return;
+    lastTrigger.current = triggerCount;
+
+    const loc = LOCATIONS.find((l) => l.value === targetValue);
     if (!loc) return;
 
-    // Calculate camera position facing this location
     const surfacePoint = latLngToVector3(loc.lat, loc.lng, GLOBE_RADIUS);
     const direction = surfacePoint.clone().normalize();
     targetPos.current = direction.multiplyScalar(CAMERA_DISTANCE);
     animating.current = true;
-  }, [targetLocation, camera]);
+  }, [triggerCount, targetValue, camera]);
 
   useFrame(() => {
     if (!animating.current || !targetPos.current) return;
 
-    const current = camera.position.clone();
-    const target = targetPos.current;
+    const current = camera.position.clone().normalize();
+    const targetNorm = targetPos.current.clone().normalize();
 
-    // Spherical lerp - keep distance constant
-    current.normalize();
-    const targetNorm = target.clone().normalize();
-
-    const newDir = current.lerp(targetNorm, 0.04);
+    const newDir = current.lerp(targetNorm, 0.06);
     newDir.normalize().multiplyScalar(CAMERA_DISTANCE);
 
     camera.position.copy(newDir);
@@ -80,12 +74,14 @@ function Scene({
   value,
   onChange,
   disabled,
-  animateToLocation,
+  flyToValue,
+  flyToTrigger,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
-  animateToLocation: string | null;
+  flyToValue: string;
+  flyToTrigger: number;
 }) {
   return (
     <>
@@ -95,7 +91,7 @@ function Scene({
       <pointLight position={[3, 8, -3]} intensity={0.3} color="hsl(168, 50%, 50%)" />
       <StylizedGlobe />
       <CountryOverlays value={value} onChange={onChange} disabled={disabled} />
-      <CameraAnimator targetLocation={animateToLocation} />
+      <CameraFlyTo targetValue={flyToValue} triggerCount={flyToTrigger} />
       <OrbitControls
         enableZoom={false}
         enablePan={false}
@@ -115,15 +111,26 @@ interface GlobeSelectorProps {
 
 export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps) {
   const selectedLabel = LOCATIONS.find((l) => l.value === value)?.label ?? value;
-  const [animateTarget, setAnimateTarget] = useState<string | null>(null);
+  const [flyToTrigger, setFlyToTrigger] = useState(0);
+  const [flyToValue, setFlyToValue] = useState(value);
+
+  // Get the intensity color for the selected location
+  const selectedIntensity = CARBON_INTENSITY[value] || 300;
+  const selectedColor = intensityToColor(selectedIntensity);
 
   const handleSelect = useCallback(
     (newValue: string) => {
-      setAnimateTarget(newValue);
+      setFlyToValue(newValue);
+      setFlyToTrigger((t) => t + 1);
       onChange(newValue);
     },
     [onChange],
   );
+
+  const handleRecenter = useCallback(() => {
+    setFlyToValue(value);
+    setFlyToTrigger((t) => t + 1);
+  }, [value]);
 
   return (
     <div className="bg-card border border-border rounded-lg shadow-card overflow-hidden">
@@ -140,11 +147,32 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
             style={{ background: "transparent" }}
             gl={{ antialias: true, alpha: true }}
           >
-            <Scene value={value} onChange={handleSelect} disabled={disabled} animateToLocation={animateTarget} />
+            <Scene
+              value={value}
+              onChange={handleSelect}
+              disabled={disabled}
+              flyToValue={flyToValue}
+              flyToTrigger={flyToTrigger}
+            />
           </Canvas>
+
+          {/* Recenter button - upper left */}
+          <button
+            onClick={handleRecenter}
+            className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border text-xs font-display text-foreground hover:bg-card transition-colors"
+            title="Recenter on selected location"
+          >
+            <Crosshair className="w-3.5 h-3.5 text-primary" />
+            Recenter
+          </button>
+
+          {/* Selected location indicator - bottom left */}
           <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border text-sm">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ background: selectedColor.color }}
+              />
               <span className="font-display font-medium text-foreground">{selectedLabel}</span>
             </div>
             {disabled && (
@@ -153,6 +181,7 @@ export function GlobeSelector({ value, onChange, disabled }: GlobeSelectorProps)
               </div>
             )}
           </div>
+
           {/* CO2 intensity legend */}
           <div className="absolute top-3 right-3 flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border text-[10px] font-display">
             <span className="text-muted-foreground">CO₂ Intensity:</span>
