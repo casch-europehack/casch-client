@@ -24,7 +24,7 @@ export function AggregatedCO2Chart({ data }: AggregatedCO2ChartProps) {
     <div className="bg-card border border-border rounded-lg p-6 shadow-card animate-slide-up">
       <div className="mb-4">
         <h3 className="text-lg font-display font-semibold text-foreground">
-          CO₂ vs Execution Time Trade-off
+          CO₂ vs Execution Time
         </h3>
         <p className="text-sm text-muted-foreground">
           Scheduling your job to run longer can significantly reduce carbon emissions

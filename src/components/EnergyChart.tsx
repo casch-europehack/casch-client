@@ -28,7 +28,7 @@ export function EnergyChart({ data }: EnergyChartProps) {
           Energy Consumption
         </h3>
         <p className="text-sm text-muted-foreground">
-          Energy per step across the full training run ({data.total_steps} steps)
+          Estimated energy per step
         </p>
       </div>
       <div className="h-72">

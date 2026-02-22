@@ -30,7 +30,7 @@ export function CO2Chart({ profilingData, co2Data }: CO2ChartProps) {
             CO₂ Emissions
           </h3>
           <p className="text-sm text-muted-foreground">
-            Per-step carbon footprint in {co2Data.location}
+            Estimated carbon emissions per step for {co2Data.location}
           </p>
         </div>
         <div className="text-right">
