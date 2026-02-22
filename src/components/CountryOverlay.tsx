@@ -6,6 +6,37 @@ import earcut from "earcut";
 
 const GLOBE_RADIUS = 2;
 
+// Mock carbon intensity data (gCO2/kWh) for color coding
+const CARBON_INTENSITY: Record<string, number> = {
+  "IE": 296,
+  "PL": 635,
+  "DE": 338,
+  "FR": 56,
+  "SE": 41,
+  "US-CAL-CISO": 210,
+  "US-NY-NYIS": 180,
+  "US-TEX-ERCO": 396,
+  "GB": 198,
+  "NO-NO1": 26,
+};
+
+// Returns HSL color based on intensity: green (low) → yellow (medium) → red (high)
+function intensityToColor(intensity: number): { base: string; emissive: string; label: string } {
+  // Range: 0-700 gCO2/kWh
+  const t = Math.min(intensity / 650, 1);
+  
+  // Hue: 120 (green) → 60 (yellow) → 0 (red)
+  const hue = Math.round(120 * (1 - t));
+  const sat = 65 + t * 15;
+  const light = 40 + (1 - t) * 10;
+  
+  return {
+    base: `hsl(${hue}, ${sat}%, ${light}%)`,
+    emissive: `hsl(${hue}, ${sat}%, ${light * 0.5}%)`,
+    label: intensity < 150 ? "Low" : intensity < 350 ? "Medium" : "High",
+  };
+}
+
 interface LocationEntry {
   value: string;
   label: string;
@@ -105,19 +136,26 @@ function CountryShape({
   geometries,
   isSelected,
   isHovered,
+  intensityColor,
   onClick,
   onHover,
 }: {
   geometries: THREE.BufferGeometry[];
   isSelected: boolean;
   isHovered: boolean;
+  intensityColor: { base: string; emissive: string };
   onClick: () => void;
   onHover: (h: boolean) => void;
 }) {
-  const color = isSelected ? "hsl(168, 60%, 50%)" : isHovered ? "hsl(38, 80%, 55%)" : "hsl(168, 55%, 30%)";
+  // Use intensity color as base, brighten on hover/select
+  const color = isSelected
+    ? intensityColor.base
+    : isHovered
+    ? intensityColor.base
+    : intensityColor.base;
 
-  const opacity = isSelected ? 0.7 : isHovered ? 0.6 : 0.3;
-  const emissive = isSelected ? "hsl(168, 60%, 30%)" : isHovered ? "hsl(38, 70%, 30%)" : "hsl(168, 55%, 10%)";
+  const opacity = isSelected ? 0.8 : isHovered ? 0.65 : 0.4;
+  const emissiveIntensity = isSelected ? 0.8 : isHovered ? 0.5 : 0.25;
 
   return (
     <group>
@@ -142,8 +180,8 @@ function CountryShape({
         >
           <meshStandardMaterial
             color={color}
-            emissive={emissive}
-            emissiveIntensity={isSelected ? 0.6 : isHovered ? 0.4 : 0.2}
+            emissive={intensityColor.emissive}
+            emissiveIntensity={emissiveIntensity}
             transparent
             opacity={opacity}
             side={THREE.DoubleSide}
@@ -167,7 +205,6 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
   const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load both datasets in parallel
     Promise.all([
       fetch("/countries-110m.json").then((r) => r.json()),
       fetch("/us-states-10m.json").then((r) => r.json()),
@@ -180,7 +217,6 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
     });
   }, []);
 
-  // Build geometries for each location
   const shapeData = useMemo(() => {
     if (!countryFeatures || !stateFeatures) return [];
 
@@ -217,6 +253,8 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
       {shapeData.map(({ location, geometries }) => {
         const isSelected = value === location.value;
         const isHovered = hoveredLocation === location.value;
+        const intensity = CARBON_INTENSITY[location.value] || 300;
+        const colorInfo = intensityToColor(intensity);
 
         return (
           <group key={location.value}>
@@ -224,6 +262,7 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
               geometries={geometries}
               isSelected={isSelected}
               isHovered={isHovered}
+              intensityColor={colorInfo}
               onClick={() => {
                 if (!disabled) onChange(location.value);
               }}
@@ -232,20 +271,50 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
             {(isHovered || isSelected) && (
               <Html
                 position={
-                  latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.15).toArray() as [number, number, number]
+                  latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.35).toArray() as [number, number, number]
                 }
                 center
-                style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
+                style={{ pointerEvents: "none", whiteSpace: "nowrap", transform: "translateY(-100%)" }}
+                zIndexRange={[100, 0]}
               >
                 <div
-                  className="px-2.5 py-1 rounded-md text-xs font-display font-medium shadow-elevated"
-                  style={{
-                    background: "hsl(170, 20%, 10%)",
-                    color: "hsl(160, 10%, 93%)",
-                    border: "1px solid hsl(168, 40%, 28%)",
-                  }}
+                  className="flex flex-col items-center gap-1"
+                  style={{ pointerEvents: "none" }}
                 >
-                  {location.label}
+                  <div
+                    className="px-2.5 py-1.5 rounded-md text-xs font-display font-medium shadow-elevated"
+                    style={{
+                      background: "hsl(170, 20%, 10%)",
+                      color: "hsl(160, 10%, 93%)",
+                      border: `1px solid ${colorInfo.base}`,
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{location.label}</span>
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                        style={{
+                          background: colorInfo.base,
+                          color: intensity > 350 ? "hsl(0,0%,100%)" : "hsl(0,0%,5%)",
+                        }}
+                      >
+                        {intensity} gCO₂
+                      </span>
+                    </div>
+                    <div className="text-[10px] mt-0.5 opacity-70">
+                      Carbon intensity: {colorInfo.label}
+                    </div>
+                  </div>
+                  {/* Arrow pointing down to the country */}
+                  <div
+                    style={{
+                      width: 0,
+                      height: 0,
+                      borderLeft: "5px solid transparent",
+                      borderRight: "5px solid transparent",
+                      borderTop: "5px solid hsl(170, 20%, 10%)",
+                    }}
+                  />
                 </div>
               </Html>
             )}
