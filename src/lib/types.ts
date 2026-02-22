@@ -52,6 +52,7 @@ export const LOCATIONS = [
   { value: "SE", label: "Sweden" },
   { value: "US-CAL-CISO", label: "California, USA" },
   { value: "US-NY-NYIS", label: "New York, USA" },
+  { value: "US-TEX-ERCO", label: "Texas, USA" },
   { value: "GB", label: "United Kingdom" },
   { value: "NO-NO1", label: "Norway" },
 ];
