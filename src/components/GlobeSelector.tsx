@@ -36,7 +36,7 @@ function StylizedGlobe() {
 }
 
 // Animates camera to face a location, then stops completely
-function CameraFlyTo({ flyToTrigger }: { flyToTrigger: { location: string; id: number } | null }) {
+function CameraFlyTo({ flyToTrigger, controlsRef }: { flyToTrigger: { location: string; id: number } | null; controlsRef: React.RefObject<any> }) {
   const { camera } = useThree();
   const targetPos = useRef<THREE.Vector3 | null>(null);
   const animating = useRef(false);
@@ -52,7 +52,9 @@ function CameraFlyTo({ flyToTrigger }: { flyToTrigger: { location: string; id: n
     const direction = surfacePoint.clone().normalize();
     targetPos.current = direction.multiplyScalar(CAMERA_DISTANCE);
     animating.current = true;
-  }, [flyToTrigger, camera]);
+    // Disable orbit controls during animation
+    if (controlsRef.current) controlsRef.current.enabled = false;
+  }, [flyToTrigger, camera, controlsRef]);
 
   useFrame(() => {
     if (!animating.current || !targetPos.current) return;
@@ -65,6 +67,11 @@ function CameraFlyTo({ flyToTrigger }: { flyToTrigger: { location: string; id: n
       camera.lookAt(0, 0, 0);
       animating.current = false;
       targetPos.current = null;
+      // Re-enable orbit controls and reset their state
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true;
+        controlsRef.current.update();
+      }
       return;
     }
 
@@ -88,6 +95,8 @@ function Scene({
   disabled?: boolean;
   flyToTrigger: { location: string; id: number } | null;
 }) {
+  const controlsRef = useRef<any>(null);
+
   return (
     <>
       <ambientLight intensity={1.6} />
@@ -96,8 +105,9 @@ function Scene({
       <pointLight position={[3, 8, -3]} intensity={0.3} color="hsl(168, 50%, 50%)" />
       <StylizedGlobe />
       <CountryOverlays value={value} onChange={onChange} disabled={disabled} />
-      <CameraFlyTo flyToTrigger={flyToTrigger} />
+      <CameraFlyTo flyToTrigger={flyToTrigger} controlsRef={controlsRef} />
       <OrbitControls
+        ref={controlsRef}
         enableZoom={false}
         enablePan={false}
         rotateSpeed={0.4}
