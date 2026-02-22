@@ -6,7 +6,7 @@ import { CountryOverlays, LOCATIONS } from "./CountryOverlay";
 const GLOBE_RADIUS = 2;
 
 function StylizedGlobe() {
-  const texture = useLoader(THREE.TextureLoader, "/earth-texture.jpg");
+  const texture = useLoader(THREE.TextureLoader, "/8081_earthmap10k.jpg");
 
   return (
     <group>
