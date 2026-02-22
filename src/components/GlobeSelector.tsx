@@ -53,17 +53,17 @@ function CameraFlyTo({ targetValue, triggerCount }: { targetValue: string; trigg
   useFrame(() => {
     if (!animating.current || !targetPos.current) return;
 
-    const current = camera.position.clone().normalize();
-    const targetNorm = targetPos.current.clone().normalize();
+    const current = camera.position.clone();
+    const target = targetPos.current.clone();
 
-    const newDir = current.lerp(targetNorm, 0.06);
-    newDir.normalize().multiplyScalar(CAMERA_DISTANCE);
-
-    camera.position.copy(newDir);
+    camera.position.lerp(target, 0.08);
     camera.lookAt(0, 0, 0);
 
-    if (current.distanceTo(targetNorm) < 0.005) {
+    if (camera.position.distanceTo(target) < 0.01) {
+      camera.position.copy(target);
+      camera.lookAt(0, 0, 0);
       animating.current = false;
+      targetPos.current = null;
     }
   });
 
