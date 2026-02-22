@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
 import * as THREE from "three";
-import { Html } from "@react-three/drei";
 import * as topojson from "topojson-client";
 import earcut from "earcut";
 
@@ -29,6 +28,35 @@ const LOCATIONS: LocationEntry[] = [
 ];
 
 export { LOCATIONS };
+
+// Export carbon intensity data so other components can use it
+export const CARBON_INTENSITY: Record<string, number> = {
+  IE: 296,
+  PL: 635,
+  DE: 338,
+  FR: 56,
+  SE: 41,
+  "US-CAL-CISO": 210,
+  "US-NY-NYIS": 180,
+  "US-TEX-ERCO": 396,
+  GB: 198,
+  "NO-NO1": 26,
+};
+
+export function intensityToColor(intensity: number): { color: string; emissive: string; label: string } {
+  if (intensity <= 100) {
+    const hue = 120;
+    return { color: `hsl(${hue}, 65%, 45%)`, emissive: `hsl(${hue}, 65%, 25%)`, label: "Low" };
+  } else if (intensity <= 300) {
+    const t = (intensity - 100) / 200;
+    const hue = 120 - t * 60;
+    return { color: `hsl(${hue}, 70%, 45%)`, emissive: `hsl(${hue}, 70%, 25%)`, label: "Medium" };
+  } else {
+    const t = Math.min((intensity - 300) / 400, 1);
+    const hue = 60 - t * 60;
+    return { color: `hsl(${hue}, 80%, 45%)`, emissive: `hsl(${hue}, 80%, 25%)`, label: "High" };
+  }
+}
 
 export function latLngToVector3(lat: number, lng: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
@@ -101,36 +129,6 @@ function getPolygons(feature: GeoFeature): { ring: number[][]; holes: number[][]
   return [];
 }
 
-// Mock carbon intensity data (gCO2/kWh)
-const CARBON_INTENSITY: Record<string, number> = {
-  IE: 296,
-  PL: 635,
-  DE: 338,
-  FR: 56,
-  SE: 41,
-  "US-CAL-CISO": 210,
-  "US-NY-NYIS": 180,
-  "US-TEX-ERCO": 396,
-  GB: 198,
-  "NO-NO1": 26,
-};
-
-function intensityToColor(intensity: number): { color: string; emissive: string; label: string } {
-  // 0-100: green, 100-300: yellow, 300+: red
-  if (intensity <= 100) {
-    const hue = 120;
-    return { color: `hsl(${hue}, 65%, 45%)`, emissive: `hsl(${hue}, 65%, 25%)`, label: "Low" };
-  } else if (intensity <= 300) {
-    const t = (intensity - 100) / 200;
-    const hue = 120 - t * 60; // 120 -> 60
-    return { color: `hsl(${hue}, 70%, 45%)`, emissive: `hsl(${hue}, 70%, 25%)`, label: "Medium" };
-  } else {
-    const t = Math.min((intensity - 300) / 400, 1);
-    const hue = 60 - t * 60; // 60 -> 0
-    return { color: `hsl(${hue}, 80%, 45%)`, emissive: `hsl(${hue}, 80%, 25%)`, label: "High" };
-  }
-}
-
 function CountryShape({
   geometries,
   isSelected,
@@ -146,12 +144,18 @@ function CountryShape({
   onClick: () => void;
   onHover: (h: boolean) => void;
 }) {
-  const color = isSelected || !isHovered ? intensityColor.color : "hsl(38, 80%, 55%)";
-  const opacity = isSelected ? 0.7 : isHovered ? 0.6 : 0.4;
-  const emissive = isSelected || !isHovered ? intensityColor.emissive : "hsl(38, 70%, 30%)";
+  // Selected: bright color, high opacity, strong glow
+  // Hovered: accent highlight
+  // Default: subtle
+  const color = isHovered && !isSelected ? "hsl(38, 80%, 55%)" : intensityColor.color;
+  const emissive = isHovered && !isSelected ? "hsl(38, 70%, 30%)" : intensityColor.emissive;
+  const opacity = isSelected ? 0.85 : isHovered ? 0.6 : 0.35;
+  const emissiveIntensity = isSelected ? 0.8 : isHovered ? 0.4 : 0.15;
+  // Selected countries render slightly above the globe surface for emphasis
+  const scale = isSelected ? 1.015 : 1;
 
   return (
-    <group>
+    <group scale={[scale, scale, scale]}>
       {geometries.map((geo, i) => (
         <mesh
           key={i}
@@ -174,7 +178,7 @@ function CountryShape({
           <meshStandardMaterial
             color={color}
             emissive={emissive}
-            emissiveIntensity={isSelected ? 0.6 : isHovered ? 0.4 : 0.2}
+            emissiveIntensity={emissiveIntensity}
             transparent
             opacity={opacity}
             side={THREE.DoubleSide}
@@ -198,7 +202,6 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
   const [hoveredLocation, setHoveredLocation] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load both datasets in parallel
     Promise.all([
       fetch("/countries-110m.json").then((r) => r.json()),
       fetch("/us-states-10m.json").then((r) => r.json()),
@@ -211,7 +214,6 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
     });
   }, []);
 
-  // Build geometries for each location
   const shapeData = useMemo(() => {
     if (!countryFeatures || !stateFeatures) return [];
 
@@ -264,38 +266,6 @@ export function CountryOverlays({ value, onChange, disabled }: CountryOverlaysPr
               }}
               onHover={(h) => setHoveredLocation(h ? location.value : null)}
             />
-            {(isHovered || isSelected) && (
-              <Html
-                position={
-                  latLngToVector3(location.lat, location.lng, GLOBE_RADIUS + 0.25).toArray() as [number, number, number]
-                }
-                center
-                style={{ pointerEvents: "none", whiteSpace: "nowrap", transform: "translateY(-100%)" }}
-              >
-                <div
-                  className="px-2.5 py-1.5 rounded-md text-xs font-display font-medium shadow-elevated flex flex-col items-center gap-0.5"
-                  style={{
-                    background: "hsl(170, 20%, 10%)",
-                    color: "hsl(160, 10%, 93%)",
-                    border: "1px solid hsl(168, 40%, 28%)",
-                  }}
-                >
-                  <span>{location.label}</span>
-                  <span className="flex items-center gap-1 text-[10px]">
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: intColor.color }} />
-                    {intensity} gCO₂/kWh · {intColor.label}
-                  </span>
-                </div>
-                <div
-                  className="mx-auto w-0 h-0"
-                  style={{
-                    borderLeft: "5px solid transparent",
-                    borderRight: "5px solid transparent",
-                    borderTop: "5px solid hsl(170, 20%, 10%)",
-                  }}
-                />
-              </Html>
-            )}
           </group>
         );
       })}
